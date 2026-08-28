@@ -234,3 +234,23 @@ No blocking observed — PWM loop stays responsive throughout.
 - Connection time: ~15 s (first retry after hotspot enabled)
 - Exponential back-off retried correctly: 8 s → 16 s → connected
 - All 5 PWM channels held 50% duty throughout Wi-Fi connect — zero glitch
+
+---
+
+## Phase 8 — WebSocket Server
+**Status:** ✅ VERIFIED — 2026-08-28
+
+### WebSocket endpoint: ws://10.102.133.78/ws
+
+### Test results (ws_test.py)
+```
+SET temperature=40.0 → {"temperature":40,"humidity":50,...}  ✅ PASS
+SET humidity=80.0    → {"temperature":40,"humidity":80,...}  ✅ PASS
+SET gas=800.0        → {"temperature":40,"humidity":80,"gas":800,...} ✅ PASS
+```
+
+### Arduino verification (PWM → physical output)
+```
+Temp: 40.00°C    Humidity: 80.04%    Gas: 797.4ppm   ✅
+```
+State persists across connections. All channels independent. Zero cross-talk.

@@ -1,15 +1,16 @@
 /**
  * main.cpp — ESP32 OneSensor Firmware Entry Point
  *
- * Phases 1–6: PWM pipeline verified ✅
- * Phase 7:    ESP32 connects to Wi-Fi. PWM continues uninterrupted.
- *             Prints IP address once connected.
- * Phase 8+:   WebSocket server activated on top of Wi-Fi.
+ * Phases 1–7: PWM + Wi-Fi verified ✅
+ * Phase 8:    WebSocket server active.
+ *             Browser sends JSON → ESP32 updates SensorState → PWM changes live.
+ * Phase 9+:   Full dashboard HTML served from SPIFFS.
  *
- * Phase 7 exit criterion:
- *   - Serial prints IP address within 15 s of boot
- *   - All 5 PWM channels continue outputting correct duty during/after Wi-Fi
- *   - No blocking delay() anywhere in connect path
+ * Phase 8 exit criterion:
+ *   curl or wscat sends {"type":"set","sensor":"temperature","value":40.0}
+ *   → ESP32 replies {"type":"state","temperature":40.0,...}
+ *   → Arduino Serial shows temperature jump to 40.0°C
+ *   → All other channels unchanged
  */
 
 #include <Arduino.h>
@@ -18,15 +19,19 @@
 #include "value_mapper.h"
 #include "channel_manager.h"
 #include "wifi_manager.h"
+#include "http_server.h"
 
-// ─── Phase 7 Test Values (stable mid-point for easy scope verification) ───────
-static const float TEST_TEMP  = 25.0f;   // °C  → 50% duty on GPIO16
-static const float TEST_HUMID = 50.0f;   // %   → 50% duty on GPIO17
-static const float TEST_GAS   = 500.0f;  // ppm → 50% duty on GPIO18
-static const float TEST_LIGHT = 500.0f;  // lux → 50% duty on GPIO19
-static const float TEST_SOIL  = 50.0f;   // %   → 50% duty on GPIO21
+// Boot defaults — mid-range on all channels
+static const float BOOT_TEMP  = 25.0f;
+static const float BOOT_HUMID = 50.0f;
+static const float BOOT_GAS   = 500.0f;
+static const float BOOT_LIGHT = 500.0f;
+static const float BOOT_SOIL  = 50.0f;
 
-static const uint32_t STATUS_INTERVAL_MS = 2000;
+static const uint32_t STATUS_INTERVAL_MS  = 3000;
+static const uint32_t BROADCAST_INTERVAL_MS = 1000;  // push state to browser
+
+static bool _serverStarted = false;
 
 // ─── setup() ─────────────────────────────────────────────────────────────────
 void setup() {
@@ -34,70 +39,67 @@ void setup() {
     delay(500);
 
     Serial.println(F("\n========================================"));
-    Serial.println(F("  OneSensor ESP32 Firmware — Phase 7"));
-    Serial.println(F("  Wi-Fi connection + PWM concurrent"));
+    Serial.println(F("  OneSensor ESP32 Firmware — Phase 8"));
+    Serial.println(F("  WebSocket server active"));
     Serial.println(F("========================================"));
 
-    // 1. Start PWM channels FIRST — they must never depend on Wi-Fi
+    // 1. PWM first — independent of network
     if (!gChannelManager.begin()) {
         Serial.println(F("[FATAL] Channel init failed. Halting."));
         while (true) { delay(1000); }
     }
-
-    // 2. Set all sensors to stable mid-point test values
-    gSensorState.set(SensorType::TEMPERATURE,  TEST_TEMP);
-    gSensorState.set(SensorType::HUMIDITY,      TEST_HUMID);
-    gSensorState.set(SensorType::GAS,           TEST_GAS);
-    gSensorState.set(SensorType::LIGHT,         TEST_LIGHT);
-    gSensorState.set(SensorType::SOIL_MOISTURE, TEST_SOIL);
+    gSensorState.set(SensorType::TEMPERATURE,  BOOT_TEMP);
+    gSensorState.set(SensorType::HUMIDITY,      BOOT_HUMID);
+    gSensorState.set(SensorType::GAS,           BOOT_GAS);
+    gSensorState.set(SensorType::LIGHT,         BOOT_LIGHT);
+    gSensorState.set(SensorType::SOIL_MOISTURE, BOOT_SOIL);
     gChannelManager.updateAll();
+    Serial.println(F("[PWM]  All 5 channels running at boot defaults (50% duty)"));
 
-    Serial.println(F("[PWM]  All 5 channels running at 50% duty (25°C / 50% / 500ppm / 500lux / 50%)"));
-    Serial.println(F("[PWM]  These will stay stable even during Wi-Fi connect.\n"));
-
-    // 3. Begin Wi-Fi (non-blocking — returns immediately)
+    // 2. Wi-Fi (non-blocking)
     gWifiManager.begin();
 }
 
 // ─── loop() ──────────────────────────────────────────────────────────────────
 void loop() {
-    static uint32_t lastStatus = 0;
+    static uint32_t lastStatus    = 0;
+    static uint32_t lastBroadcast = 0;
 
-    // ── Keep PWM updated every loop tick (microseconds, never blocks) ─────────
+    // ── PWM — must run every tick ─────────────────────────────────────────────
     gChannelManager.updateAll();
 
-    // ── Drive Wi-Fi state machine (non-blocking) ──────────────────────────────
+    // ── Wi-Fi state machine ───────────────────────────────────────────────────
     gWifiManager.update();
 
-    // ── Periodic status print ─────────────────────────────────────────────────
+    // ── Start HTTP/WebSocket server once Wi-Fi is up (only once) ─────────────
+    if (gWifiManager.isConnected() && !_serverStarted) {
+        _serverStarted = true;
+        gHttpServer.begin();
+    }
+
+    // ── WebSocket housekeeping ─────────────────────────────────────────────────
+    if (_serverStarted) {
+        gHttpServer.update();  // cleans up disconnected clients
+    }
+
+    // ── Periodic state broadcast to connected browsers ────────────────────────
+    if (_serverStarted && millis() - lastBroadcast >= BROADCAST_INTERVAL_MS) {
+        lastBroadcast = millis();
+        if (gHttpServer.clientCount() > 0) {
+            gHttpServer.broadcastState();
+        }
+    }
+
+    // ── Serial status ─────────────────────────────────────────────────────────
     if (millis() - lastStatus >= STATUS_INTERVAL_MS) {
         lastStatus = millis();
-
-        Serial.println(F("--- OneSensor Status ---"));
-        for (uint8_t i = 0; i < CHANNEL_COUNT; i++) {
-            const ChannelConfig& ch = CHANNEL_TABLE[i];
-            float logVal  = gSensorState.getByType(ch.sensor);
-            float dutyPct = valueToDutyPercent(logVal, ch.inputMin, ch.inputMax);
-            const char* name = "?    ";
-            switch (ch.sensor) {
-                case SensorType::TEMPERATURE:   name = "Temp "; break;
-                case SensorType::HUMIDITY:      name = "Humid"; break;
-                case SensorType::GAS:           name = "Gas  "; break;
-                case SensorType::LIGHT:         name = "Light"; break;
-                case SensorType::SOIL_MOISTURE: name = "Soil "; break;
-            }
-            Serial.printf("  %s GPIO%-2u  val=%6.1f  duty=%5.1f%%\n",
-                          name, ch.gpio, logVal, dutyPct);
-        }
-
-        // Wi-Fi status line
-        if (gWifiManager.isConnected()) {
-            Serial.printf("  WiFi  %-15s  RSSI=%d dBm\n",
-                          gWifiManager.localIP().toString().c_str(),
-                          WiFi.RSSI());
-        } else {
-            Serial.println(F("  WiFi  connecting..."));
-        }
-        Serial.println(F("------------------------"));
+        SensorValues v = gSensorState.get();
+        Serial.printf("[Status] T=%.1f H=%.1f G=%.0f L=%.0f S=%.1f | "
+                      "WiFi=%s | WS clients=%u\n",
+                      v.temperature, v.humidity, v.gas, v.light, v.soilMoisture,
+                      gWifiManager.isConnected()
+                          ? gWifiManager.localIP().toString().c_str()
+                          : "connecting",
+                      _serverStarted ? gHttpServer.clientCount() : 0);
     }
 }
