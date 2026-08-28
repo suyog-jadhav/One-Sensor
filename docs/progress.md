@@ -278,3 +278,18 @@ State persists across connections. All channels independent. Zero cross-talk.
   - End-to-End update latency on Arduino: **742.6 ms** (spec requirement: < 1000 ms)
 - Target: 42.50°C | Arduino measured: 42.56°C (error: ±0.06°C)
 - Zero cross-talk or disturbance observed on other channels.
+
+---
+
+## Phase 11 — Scenario Engine (STATIC + RAMP)
+**Status:** ✅ VERIFIED — 2026-08-28
+
+### Modular Non-Blocking Scenario Engine
+- Implemented `ScenarioEngine`, `StaticScenario`, and `RampScenario`
+- Runs in `main.cpp` using `millis()` state machine (zero `delay()` calls)
+- WS Commands: `start_ramp`, `start_static`, `stop_scenario`, `stop_all_scenarios`
+- Live Ramp verification (0°C -> 50°C over 10s):
+  - t=1.24s: 6.01°C
+  - t=5.00s: 24.80°C (exact mid-point)
+  - t=9.83s: 48.94°C
+  - t=10.40s: 48.94°C (ramp finished cleanly)

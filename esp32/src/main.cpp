@@ -1,16 +1,9 @@
 /**
  * main.cpp — ESP32 OneSensor Firmware Entry Point
  *
- * Phases 1–7: PWM + Wi-Fi verified ✅
- * Phase 8:    WebSocket server active.
- *             Browser sends JSON → ESP32 updates SensorState → PWM changes live.
- * Phase 9+:   Full dashboard HTML served from SPIFFS.
- *
- * Phase 8 exit criterion:
- *   curl or wscat sends {"type":"set","sensor":"temperature","value":40.0}
- *   → ESP32 replies {"type":"state","temperature":40.0,...}
- *   → Arduino Serial shows temperature jump to 40.0°C
- *   → All other channels unchanged
+ * Phase 11: Scenario Engine active (STATIC + RAMP)
+ *           Non-blocking scenario update loop advances SensorState on timer.
+ *           PWM channels update continuously.
  */
 
 #include <Arduino.h>
@@ -20,6 +13,7 @@
 #include "channel_manager.h"
 #include "wifi_manager.h"
 #include "http_server.h"
+#include "scenario_engine.h"
 
 // Boot defaults — mid-range on all channels
 static const float BOOT_TEMP  = 25.0f;
@@ -28,8 +22,8 @@ static const float BOOT_GAS   = 500.0f;
 static const float BOOT_LIGHT = 500.0f;
 static const float BOOT_SOIL  = 50.0f;
 
-static const uint32_t STATUS_INTERVAL_MS  = 3000;
-static const uint32_t BROADCAST_INTERVAL_MS = 1000;  // push state to browser
+static const uint32_t STATUS_INTERVAL_MS    = 3000;
+static const uint32_t BROADCAST_INTERVAL_MS = 250;  // 4Hz live update broadcast during ramps
 
 static bool _serverStarted = false;
 
@@ -39,8 +33,8 @@ void setup() {
     delay(500);
 
     Serial.println(F("\n========================================"));
-    Serial.println(F("  OneSensor ESP32 Firmware — Phase 8"));
-    Serial.println(F("  WebSocket server active"));
+    Serial.println(F("  OneSensor ESP32 Firmware — Phase 11"));
+    Serial.println(F("  Scenario Engine (STATIC + RAMP) Active"));
     Serial.println(F("========================================"));
 
     // 1. PWM first — independent of network
@@ -65,24 +59,27 @@ void loop() {
     static uint32_t lastStatus    = 0;
     static uint32_t lastBroadcast = 0;
 
-    // ── PWM — must run every tick ─────────────────────────────────────────────
+    // ── 1. Scenario Engine ticks every loop iteration (non-blocking) ─────────
+    gScenarioEngine.update(gSensorState, gChannelManager);
+
+    // ── 2. PWM — must run every tick ─────────────────────────────────────────
     gChannelManager.updateAll();
 
-    // ── Wi-Fi state machine ───────────────────────────────────────────────────
+    // ── 3. Wi-Fi state machine ───────────────────────────────────────────────
     gWifiManager.update();
 
-    // ── Start HTTP/WebSocket server once Wi-Fi is up (only once) ─────────────
+    // ── 4. Start HTTP/WebSocket server once Wi-Fi is up ──────────────────────
     if (gWifiManager.isConnected() && !_serverStarted) {
         _serverStarted = true;
         gHttpServer.begin();
     }
 
-    // ── WebSocket housekeeping ─────────────────────────────────────────────────
+    // ── 5. WebSocket housekeeping ─────────────────────────────────────────────
     if (_serverStarted) {
-        gHttpServer.update();  // cleans up disconnected clients
+        gHttpServer.update();
     }
 
-    // ── Periodic state broadcast to connected browsers ────────────────────────
+    // ── 6. Periodic state broadcast to connected browsers ────────────────────
     if (_serverStarted && millis() - lastBroadcast >= BROADCAST_INTERVAL_MS) {
         lastBroadcast = millis();
         if (gHttpServer.clientCount() > 0) {
@@ -90,7 +87,7 @@ void loop() {
         }
     }
 
-    // ── Serial status ─────────────────────────────────────────────────────────
+    // ── 7. Serial status ─────────────────────────────────────────────────────
     if (millis() - lastStatus >= STATUS_INTERVAL_MS) {
         lastStatus = millis();
         SensorValues v = gSensorState.get();

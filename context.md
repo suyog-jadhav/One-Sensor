@@ -1,8 +1,8 @@
 # OneSensor — Project Context (Living Document)
 
 > **Last Updated:** 2026-08-28  
-> **Current Phase:** Phase 11 — Scenario Engine  
-> **Overall Status:** 🟢 Phases 1–10 verified. Phase 11 next.
+> **Current Phase:** Phase 12 — Calibration + Accuracy Logging  
+> **Overall Status:** 🟢 Phases 1–11 verified. Phase 12 next.
 
 ---
 
