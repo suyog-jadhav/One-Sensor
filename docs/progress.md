@@ -254,3 +254,15 @@ SET gas=800.0        → {"temperature":40,"humidity":80,"gas":800,...} ✅ PASS
 Temp: 40.00°C    Humidity: 80.04%    Gas: 797.4ppm   ✅
 ```
 State persists across connections. All channels independent. Zero cross-talk.
+
+---
+
+## Phase 9 — Web Dashboard Built & Connected
+**Status:** ✅ VERIFIED — 2026-08-28
+
+### Embedded Dashboard (PROGMEM)
+- Served directly at `http://10.102.133.78/` (no external host needed)
+- Glassmorphism dark mode UI with 5 color-coded sensor panels
+- Auto-connecting WebSocket client on `ws://10.102.133.78/ws` with reconnection logic
+- Live sliders send `{"type":"set","sensor":"...","value":X}` on change
+- Tested via HTTP GET (`200 OK`, HTML parsed) and live WebSocket test (`200 OK`, response verified)

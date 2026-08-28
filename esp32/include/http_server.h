@@ -17,6 +17,7 @@
 #include <ArduinoJson.h>
 #include "websocket_handler.h"
 #include "sensor_state.h"
+#include "dashboard_html.h"
 
 class HttpServer {
 public:
@@ -67,13 +68,13 @@ public:
             req->send(200, "application/json", buf);
         });
 
-        // ── Catch-all → Phase 9 will serve full dashboard HTML ────────────────
+        // ── Dashboard HTML at / ───────────────────────────────────────────────
         _server.on("/", HTTP_GET, [](AsyncWebServerRequest* req) {
-            req->send(200, "text/plain",
-                "OneSensor WebSocket API ready.\n"
-                "Connect via ws://<ip>/ws\n"
-                "Send: {\"type\":\"set\",\"sensor\":\"temperature\",\"value\":30.5}\n"
-                "Recv: {\"type\":\"state\",\"temperature\":30.5,...}\n");
+            AsyncWebServerResponse* resp = req->beginResponse_P(
+                200, "text/html; charset=utf-8",
+                (const uint8_t*)DASHBOARD_HTML, strlen_P(DASHBOARD_HTML));
+            resp->addHeader("Cache-Control", "no-cache");
+            req->send(resp);
         });
 
         _server.begin();
