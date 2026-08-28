@@ -6,11 +6,13 @@ esp32/.pio/
 esp32/.pioenvs/
 esp32/.piolibdeps/
 
-# ─── Arduino IDE ──────────────────────────────────────────────────────────────
+# ─── Arduino IDE / arduino-cli build output ──────────────────────────────────
+arduino/**/build/
 arduino/**/*.elf
 arduino/**/*.hex
 arduino/**/*.bin
 arduino/**/*.map
+arduino/**/*.eep
 
 # ─── VS Code ──────────────────────────────────────────────────────────────────
 .vscode/
