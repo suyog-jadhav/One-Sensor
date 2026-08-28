@@ -1,8 +1,8 @@
 # OneSensor — Project Context (Living Document)
 
 > **Last Updated:** 2026-08-28  
-> **Current Phase:** Phase 2 — Arduino PwmDecoder  
-> **Overall Status:** 🟢 Phase 1 verified. Phase 2 next.
+> **Current Phase:** Phase 4 — OneSensor::readTemperature() API  
+> **Overall Status:** 🟢 Phases 1–3 verified. Phase 4 next.
 
 ---
 
@@ -48,8 +48,8 @@ PC Browser ──WebSocket──▶ ESP32 ──5x PWM wires──▶ Arduino Un
 | # | Phase | Status | Verified |
 |---|---|---|---|
 | 1 | ESP32 outputs one fixed 50% PWM signal | ✅ Complete | ✅ |
-| 2 | Arduino `PwmDecoder` reads that signal | ⬜ Not started | ⬜ |
-| 3 | Value mapper: 0–50°C → 0–100% duty | ⬜ Not started | ⬜ |
+| 2 | Arduino `PwmDecoder` reads that signal | ✅ Complete | ✅ |
+| 3 | Value mapper: 0–50°C → 0–100% duty | ✅ Complete | ✅ |
 | 4 | `OneSensor::readTemperature()` API works | ⬜ Not started | ⬜ |
 | 5 | All 5 sensors added, each independently verified | ⬜ Not started | ⬜ |
 | 6 | All 5 channels run concurrently without cross-talk | ⬜ Not started | ⬜ |

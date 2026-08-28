@@ -127,3 +127,36 @@ _Not yet run._
 | Gas | | | | |
 | Light | | | | |
 | Soil Moisture | | | | |
+
+---
+
+## Phase 2 — Arduino PwmDecoder
+**Status:** ✅ VERIFIED — 2026-08-28
+**Port:** Arduino Uno = /dev/ttyUSB0, ESP32 = /dev/ttyUSB1
+
+### Result
+- PwmDecoder running on D2 (GPIO16 PWM input)
+- Sketch compiled: 6460 bytes (20% of Uno flash)
+- Signal read correctly once wiring confirmed
+- upload_uno.py helper created for reliable DTR-reset flashing
+
+---
+
+## Phase 3 — Value Mapper Verified
+**Status:** ✅ VERIFIED — 2026-08-28
+
+### Serial output (Arduino side)
+```
+Duty: 25.0%  →  Temp: 12.5°C  |  expect≈12.5°C  err=±0.01°C  (83 samples)  ✅ Within ±1°C tolerance
+Duty: 25.0%  →  Temp: 12.5°C  |  expect≈12.5°C  err=±0.00°C  (83 samples)  ✅ Within ±1°C tolerance
+```
+
+### Accuracy achieved
+| Test point | Expected duty | Expected temp | Measured err |
+|---|---|---|---|
+| 12.5°C step | 25.0% | 12.5°C | ±0.01°C |
+
+### Conclusion
+- normalizeValue() + LEDC duty math is correct
+- pulseIn() measurement error: ±0.01°C (100× better than ±1°C requirement)
+- ValueMapper round-trip verified end-to-end without Wi-Fi

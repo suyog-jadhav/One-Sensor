@@ -1,19 +1,16 @@
 /**
  * main.cpp — ESP32 OneSensor Firmware Entry Point
  *
- * Phase 1: Outputs one fixed 50% PWM signal on the Temperature channel (GPIO16).
- *          No Wi-Fi. No WebSocket. No sensor math yet.
- *
- * Phase 3+: SensorState set to a default value; ValueMapper converts to duty.
+ * Phase 1: Fixed 50% duty verified ✅
+ * Phase 3: SensorState → ValueMapper → LEDC PWM (active now)
+ *           Runs a repeating test sequence of known temperatures so the
+ *           Arduino side can verify the duty-cycle math without Wi-Fi.
  * Phase 7+: Wi-Fi added; Phase 8+: WebSocket server activated.
  *
- * Build with PlatformIO: `pio run --target upload`
- * Monitor:               `pio device monitor`
- *
- * Exit criterion for Phase 1:
- *   Serial prints "PWM running..." and the duty values for each configured channel.
- *   A second device (another Arduino/ESP32) or logic analyser confirms ~50% duty
- *   on GPIO16 at 500 Hz.
+ * Phase 3 exit criterion:
+ *   Setting temperature = 25.0°C in SensorState → Arduino reads ~50% duty
+ *   Setting temperature =  0.0°C               → Arduino reads ~0%  duty
+ *   Setting temperature = 50.0°C               → Arduino reads ~100% duty
  */
 
 #include <Arduino.h>
@@ -22,78 +19,110 @@
 #include "value_mapper.h"
 #include "channel_manager.h"
 
-// ─── Phase 1 Configuration ────────────────────────────────────────────────────
-// In Phase 1 we output a fixed 50% duty on channel 0 (Temperature GPIO).
-// Set PHASE1_FIXED_DUTY to the duty cycle you want to verify.
-// At Phase 3+, this is replaced by gSensorState-driven values.
-static const float PHASE1_FIXED_DUTY = 50.0f;   // %
+// ─── Phase 3 Test Sequence ────────────────────────────────────────────────────
+// The firmware cycles through these temperatures automatically.
+// Watch the Arduino serial monitor to verify each maps to the expected duty.
+//
+// Expected duty = (temp / 50.0) * 100.0
+//   0°C  → 0%    | 12.5°C → 25%  | 25°C → 50%
+//  37.5°C→ 75%   | 50°C   → 100%
+struct TestStep {
+    float temperature;   // °C to load into SensorState
+    float expectedDuty;  // what Arduino should read (%)
+    const char* label;
+};
 
-// Print interval for status logging (ms)
-static const uint32_t STATUS_INTERVAL_MS = 2000;
+static const TestStep TEST_SEQUENCE[] = {
+    {  0.0f,   0.0f, "0°C   →  0% duty" },
+    { 12.5f,  25.0f, "12.5°C → 25% duty" },
+    { 25.0f,  50.0f, "25°C  → 50% duty"  },   // ← Phase 1 baseline
+    { 37.5f,  75.0f, "37.5°C → 75% duty" },
+    { 50.0f, 100.0f, "50°C  →100% duty"  },
+};
+static const uint8_t  TEST_STEP_COUNT    = sizeof(TEST_SEQUENCE) / sizeof(TEST_SEQUENCE[0]);
+static const uint32_t STEP_HOLD_MS       = 5000;   // hold each value for 5 s
+static const uint32_t STATUS_INTERVAL_MS = 1000;   // print status every 1 s
 
 // ─── setup() ─────────────────────────────────────────────────────────────────
 void setup() {
     Serial.begin(115200);
-    delay(500);  // Let serial monitor connect
+    delay(500);
 
     Serial.println(F("\n========================================"));
-    Serial.println(F("  OneSensor ESP32 Firmware — Phase 1"));
+    Serial.println(F("  OneSensor ESP32 Firmware — Phase 3"));
+    Serial.println(F("  ValueMapper: SensorState → PWM duty"));
     Serial.println(F("========================================"));
     Serial.printf("  CHANNEL_COUNT : %u\n", CHANNEL_COUNT);
-    Serial.printf("  PWM Frequency : %u Hz (first channel)\n", CHANNEL_TABLE[0].frequencyHz);
+    Serial.printf("  PWM Frequency : %u Hz\n", CHANNEL_TABLE[0].frequencyHz);
     Serial.printf("  Resolution    : %u-bit\n", CHANNEL_TABLE[0].resolutionBits);
     Serial.println(F("----------------------------------------"));
 
-    // Initialise all channels (validates GPIO config, sets up LEDC, outputs defaults)
     if (!gChannelManager.begin()) {
-        Serial.println(F("[FATAL] Channel init failed. Check wiring and hardware_config.h."));
-        // Halt — do not proceed with bad config
+        Serial.println(F("[FATAL] Channel init failed. Halting."));
         while (true) { delay(1000); }
     }
 
-    // Phase 1: Override channel 0 (Temperature) with a fixed 50% duty for verification.
-    // This bypasses SensorState / ValueMapper intentionally so Phase 1 can be
-    // verified without Phase 3 math being correct first.
-    Serial.printf("\n[Phase 1] Setting fixed %.0f%% duty on Temperature channel (GPIO%u)...\n",
-                  PHASE1_FIXED_DUTY, CHANNEL_TABLE[0].gpio);
-    gChannelManager.setDutyPercent(0, PHASE1_FIXED_DUTY);
-
-    Serial.println(F("\n[Phase 1] PWM running. Verify duty cycle on GPIO16 with:"));
-    Serial.println(F("           - A second Arduino running PwmDecoder (Phase 2)"));
-    Serial.println(F("           - A logic analyser"));
-    Serial.println(F("           - A scope or frequency counter"));
-    Serial.println(F("\n[Phase 1] Status will print every 2 seconds."));
+    // Phase 3: SensorState starts at defaults (25°C → 50% duty).
+    // updateAll() in loop() keeps PWM in sync with SensorState continuously.
+    Serial.println(F("\n[Phase 3] Test sequence active (5 s per step)."));
+    Serial.println(F("[Phase 3] Monitor Arduino Serial for duty verification.\n"));
 }
 
 // ─── loop() ──────────────────────────────────────────────────────────────────
 void loop() {
+    static uint32_t lastStep   = 0;
     static uint32_t lastStatus = 0;
+    static uint8_t  stepIdx    = 0;
 
-    // Periodic status print (not every loop — that would flood Serial)
+    // ── Step advance every STEP_HOLD_MS ──────────────────────────────────────
+    if (millis() - lastStep >= STEP_HOLD_MS) {
+        lastStep = millis();
+        const TestStep& s = TEST_SEQUENCE[stepIdx];
+
+        // Write new temperature into SensorState (thread-safe setter)
+        gSensorState.set(SensorType::TEMPERATURE, s.temperature);
+
+        // Push updated state to all PWM channels immediately
+        gChannelManager.updateAll();
+
+        Serial.println(F("\n══════════════════════════════════════"));
+        Serial.printf("[Phase 3] STEP %u/%u: %s\n",
+                      stepIdx + 1, TEST_STEP_COUNT, s.label);
+        Serial.printf("  Set temp    = %5.1f °C\n", s.temperature);
+        Serial.printf("  Expect duty = %5.1f %%\n", s.expectedDuty);
+        Serial.printf("  Mapped duty = %5.1f %%\n",
+                      valueToDutyPercent(s.temperature,
+                                         CHANNEL_TABLE[0].inputMin,
+                                         CHANNEL_TABLE[0].inputMax));
+        Serial.println(F("══════════════════════════════════════"));
+
+        stepIdx = (stepIdx + 1) % TEST_STEP_COUNT;  // wrap around
+    }
+
+    // ── Continuous PWM update (handles all 5 channels) ───────────────────────
+    // This is non-blocking; each ledcWrite() completes in microseconds.
+    gChannelManager.updateAll();
+
+    // ── Periodic status print ─────────────────────────────────────────────────
     if (millis() - lastStatus >= STATUS_INTERVAL_MS) {
         lastStatus = millis();
 
-        Serial.println(F("\n--- OneSensor Status ---"));
+        Serial.println(F("--- OneSensor Status ---"));
         for (uint8_t i = 0; i < CHANNEL_COUNT; i++) {
             const ChannelConfig& ch = CHANNEL_TABLE[i];
-            float logVal   = gSensorState.getByType(ch.sensor);
-            float dutyPct  = valueToDutyPercent(logVal, ch.inputMin, ch.inputMax);
-            const char* sensorName = "UNKNOWN";
+            float logVal  = gSensorState.getByType(ch.sensor);
+            float dutyPct = valueToDutyPercent(logVal, ch.inputMin, ch.inputMax);
+            const char* name = "UNKNOWN";
             switch (ch.sensor) {
-                case SensorType::TEMPERATURE:   sensorName = "Temperature";   break;
-                case SensorType::HUMIDITY:      sensorName = "Humidity";      break;
-                case SensorType::GAS:           sensorName = "Gas";           break;
-                case SensorType::LIGHT:         sensorName = "Light";         break;
-                case SensorType::SOIL_MOISTURE: sensorName = "SoilMoisture";  break;
+                case SensorType::TEMPERATURE:   name = "Temp ";   break;
+                case SensorType::HUMIDITY:      name = "Humid";   break;
+                case SensorType::GAS:           name = "Gas  ";   break;
+                case SensorType::LIGHT:         name = "Light";   break;
+                case SensorType::SOIL_MOISTURE: name = "Soil ";   break;
             }
-            Serial.printf("  Ch%u %-14s GPIO%-2u  value=%6.1f  duty=%5.1f%%\n",
-                          i, sensorName, ch.gpio, logVal, dutyPct);
+            Serial.printf("  Ch%u %s GPIO%-2u  val=%6.1f  duty=%5.1f%%\n",
+                          i, name, ch.gpio, logVal, dutyPct);
         }
         Serial.println(F("------------------------"));
     }
-
-    // Phase 3+: gChannelManager.updateAll() will be called here to push
-    // live SensorState values to PWM. Not needed in Phase 1 (fixed duty set in setup).
-    // Uncomment for Phase 3+:
-    // gChannelManager.updateAll();
 }
