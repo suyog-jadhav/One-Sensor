@@ -1,16 +1,15 @@
 /**
  * main.cpp — ESP32 OneSensor Firmware Entry Point
  *
- * Phase 1: Fixed 50% duty verified ✅
- * Phase 3: SensorState → ValueMapper → LEDC PWM (active now)
- *           Runs a repeating test sequence of known temperatures so the
- *           Arduino side can verify the duty-cycle math without Wi-Fi.
- * Phase 7+: Wi-Fi added; Phase 8+: WebSocket server activated.
+ * Phases 1–6: PWM pipeline verified ✅
+ * Phase 7:    ESP32 connects to Wi-Fi. PWM continues uninterrupted.
+ *             Prints IP address once connected.
+ * Phase 8+:   WebSocket server activated on top of Wi-Fi.
  *
- * Phase 3 exit criterion:
- *   Setting temperature = 25.0°C in SensorState → Arduino reads ~50% duty
- *   Setting temperature =  0.0°C               → Arduino reads ~0%  duty
- *   Setting temperature = 50.0°C               → Arduino reads ~100% duty
+ * Phase 7 exit criterion:
+ *   - Serial prints IP address within 15 s of boot
+ *   - All 5 PWM channels continue outputting correct duty during/after Wi-Fi
+ *   - No blocking delay() anywhere in connect path
  */
 
 #include <Arduino.h>
@@ -18,30 +17,16 @@
 #include "sensor_state.h"
 #include "value_mapper.h"
 #include "channel_manager.h"
+#include "wifi_manager.h"
 
-// ─── Phase 3 Test Sequence ────────────────────────────────────────────────────
-// The firmware cycles through these temperatures automatically.
-// Watch the Arduino serial monitor to verify each maps to the expected duty.
-//
-// Expected duty = (temp / 50.0) * 100.0
-//   0°C  → 0%    | 12.5°C → 25%  | 25°C → 50%
-//  37.5°C→ 75%   | 50°C   → 100%
-struct TestStep {
-    float temperature;   // °C to load into SensorState
-    float expectedDuty;  // what Arduino should read (%)
-    const char* label;
-};
+// ─── Phase 7 Test Values (stable mid-point for easy scope verification) ───────
+static const float TEST_TEMP  = 25.0f;   // °C  → 50% duty on GPIO16
+static const float TEST_HUMID = 50.0f;   // %   → 50% duty on GPIO17
+static const float TEST_GAS   = 500.0f;  // ppm → 50% duty on GPIO18
+static const float TEST_LIGHT = 500.0f;  // lux → 50% duty on GPIO19
+static const float TEST_SOIL  = 50.0f;   // %   → 50% duty on GPIO21
 
-static const TestStep TEST_SEQUENCE[] = {
-    {  0.0f,   0.0f, "0°C   →  0% duty" },
-    { 12.5f,  25.0f, "12.5°C → 25% duty" },
-    { 25.0f,  50.0f, "25°C  → 50% duty"  },   // ← Phase 1 baseline
-    { 37.5f,  75.0f, "37.5°C → 75% duty" },
-    { 50.0f, 100.0f, "50°C  →100% duty"  },
-};
-static const uint8_t  TEST_STEP_COUNT    = sizeof(TEST_SEQUENCE) / sizeof(TEST_SEQUENCE[0]);
-static const uint32_t STEP_HOLD_MS       = 5000;   // hold each value for 5 s
-static const uint32_t STATUS_INTERVAL_MS = 1000;   // print status every 1 s
+static const uint32_t STATUS_INTERVAL_MS = 2000;
 
 // ─── setup() ─────────────────────────────────────────────────────────────────
 void setup() {
@@ -49,59 +34,40 @@ void setup() {
     delay(500);
 
     Serial.println(F("\n========================================"));
-    Serial.println(F("  OneSensor ESP32 Firmware — Phase 3"));
-    Serial.println(F("  ValueMapper: SensorState → PWM duty"));
+    Serial.println(F("  OneSensor ESP32 Firmware — Phase 7"));
+    Serial.println(F("  Wi-Fi connection + PWM concurrent"));
     Serial.println(F("========================================"));
-    Serial.printf("  CHANNEL_COUNT : %u\n", CHANNEL_COUNT);
-    Serial.printf("  PWM Frequency : %u Hz\n", CHANNEL_TABLE[0].frequencyHz);
-    Serial.printf("  Resolution    : %u-bit\n", CHANNEL_TABLE[0].resolutionBits);
-    Serial.println(F("----------------------------------------"));
 
+    // 1. Start PWM channels FIRST — they must never depend on Wi-Fi
     if (!gChannelManager.begin()) {
         Serial.println(F("[FATAL] Channel init failed. Halting."));
         while (true) { delay(1000); }
     }
 
-    // Phase 3: SensorState starts at defaults (25°C → 50% duty).
-    // updateAll() in loop() keeps PWM in sync with SensorState continuously.
-    Serial.println(F("\n[Phase 3] Test sequence active (5 s per step)."));
-    Serial.println(F("[Phase 3] Monitor Arduino Serial for duty verification.\n"));
+    // 2. Set all sensors to stable mid-point test values
+    gSensorState.set(SensorType::TEMPERATURE,  TEST_TEMP);
+    gSensorState.set(SensorType::HUMIDITY,      TEST_HUMID);
+    gSensorState.set(SensorType::GAS,           TEST_GAS);
+    gSensorState.set(SensorType::LIGHT,         TEST_LIGHT);
+    gSensorState.set(SensorType::SOIL_MOISTURE, TEST_SOIL);
+    gChannelManager.updateAll();
+
+    Serial.println(F("[PWM]  All 5 channels running at 50% duty (25°C / 50% / 500ppm / 500lux / 50%)"));
+    Serial.println(F("[PWM]  These will stay stable even during Wi-Fi connect.\n"));
+
+    // 3. Begin Wi-Fi (non-blocking — returns immediately)
+    gWifiManager.begin();
 }
 
 // ─── loop() ──────────────────────────────────────────────────────────────────
 void loop() {
-    static uint32_t lastStep   = 0;
     static uint32_t lastStatus = 0;
-    static uint8_t  stepIdx    = 0;
 
-    // ── Step advance every STEP_HOLD_MS ──────────────────────────────────────
-    if (millis() - lastStep >= STEP_HOLD_MS) {
-        lastStep = millis();
-        const TestStep& s = TEST_SEQUENCE[stepIdx];
-
-        // Write new temperature into SensorState (thread-safe setter)
-        gSensorState.set(SensorType::TEMPERATURE, s.temperature);
-
-        // Push updated state to all PWM channels immediately
-        gChannelManager.updateAll();
-
-        Serial.println(F("\n══════════════════════════════════════"));
-        Serial.printf("[Phase 3] STEP %u/%u: %s\n",
-                      stepIdx + 1, TEST_STEP_COUNT, s.label);
-        Serial.printf("  Set temp    = %5.1f °C\n", s.temperature);
-        Serial.printf("  Expect duty = %5.1f %%\n", s.expectedDuty);
-        Serial.printf("  Mapped duty = %5.1f %%\n",
-                      valueToDutyPercent(s.temperature,
-                                         CHANNEL_TABLE[0].inputMin,
-                                         CHANNEL_TABLE[0].inputMax));
-        Serial.println(F("══════════════════════════════════════"));
-
-        stepIdx = (stepIdx + 1) % TEST_STEP_COUNT;  // wrap around
-    }
-
-    // ── Continuous PWM update (handles all 5 channels) ───────────────────────
-    // This is non-blocking; each ledcWrite() completes in microseconds.
+    // ── Keep PWM updated every loop tick (microseconds, never blocks) ─────────
     gChannelManager.updateAll();
+
+    // ── Drive Wi-Fi state machine (non-blocking) ──────────────────────────────
+    gWifiManager.update();
 
     // ── Periodic status print ─────────────────────────────────────────────────
     if (millis() - lastStatus >= STATUS_INTERVAL_MS) {
@@ -112,16 +78,25 @@ void loop() {
             const ChannelConfig& ch = CHANNEL_TABLE[i];
             float logVal  = gSensorState.getByType(ch.sensor);
             float dutyPct = valueToDutyPercent(logVal, ch.inputMin, ch.inputMax);
-            const char* name = "UNKNOWN";
+            const char* name = "?    ";
             switch (ch.sensor) {
-                case SensorType::TEMPERATURE:   name = "Temp ";   break;
-                case SensorType::HUMIDITY:      name = "Humid";   break;
-                case SensorType::GAS:           name = "Gas  ";   break;
-                case SensorType::LIGHT:         name = "Light";   break;
-                case SensorType::SOIL_MOISTURE: name = "Soil ";   break;
+                case SensorType::TEMPERATURE:   name = "Temp "; break;
+                case SensorType::HUMIDITY:      name = "Humid"; break;
+                case SensorType::GAS:           name = "Gas  "; break;
+                case SensorType::LIGHT:         name = "Light"; break;
+                case SensorType::SOIL_MOISTURE: name = "Soil "; break;
             }
-            Serial.printf("  Ch%u %s GPIO%-2u  val=%6.1f  duty=%5.1f%%\n",
-                          i, name, ch.gpio, logVal, dutyPct);
+            Serial.printf("  %s GPIO%-2u  val=%6.1f  duty=%5.1f%%\n",
+                          name, ch.gpio, logVal, dutyPct);
+        }
+
+        // Wi-Fi status line
+        if (gWifiManager.isConnected()) {
+            Serial.printf("  WiFi  %-15s  RSSI=%d dBm\n",
+                          gWifiManager.localIP().toString().c_str(),
+                          WiFi.RSSI());
+        } else {
+            Serial.println(F("  WiFi  connecting..."));
         }
         Serial.println(F("------------------------"));
     }

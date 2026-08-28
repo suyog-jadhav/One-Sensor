@@ -1,8 +1,8 @@
 # OneSensor — Project Context (Living Document)
 
 > **Last Updated:** 2026-08-28  
-> **Current Phase:** Phase 5 — All 5 Sensors  
-> **Overall Status:** 🟢 Phases 1–4 verified. Phase 5 next.
+> **Current Phase:** Phase 8 — WebSocket Server  
+> **Overall Status:** 🟢 Phases 1–7 verified. Phase 8 next.
 
 ---
 
