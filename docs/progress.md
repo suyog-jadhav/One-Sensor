@@ -266,3 +266,15 @@ State persists across connections. All channels independent. Zero cross-talk.
 - Auto-connecting WebSocket client on `ws://10.102.133.78/ws` with reconnection logic
 - Live sliders send `{"type":"set","sensor":"...","value":X}` on change
 - Tested via HTTP GET (`200 OK`, HTML parsed) and live WebSocket test (`200 OK`, response verified)
+
+---
+
+## Phase 10 — Live Updates End-to-End
+**Status:** ✅ VERIFIED — 2026-08-28
+
+### E2E Latency Benchmark
+- WebSocket command sent from client → ESP32 process → PWM output change → Arduino `PwmDecoder` pulseIn measurement → Serial print:
+  - WebSocket RTT: 121.7 ms
+  - End-to-End update latency on Arduino: **742.6 ms** (spec requirement: < 1000 ms)
+- Target: 42.50°C | Arduino measured: 42.56°C (error: ±0.06°C)
+- Zero cross-talk or disturbance observed on other channels.
