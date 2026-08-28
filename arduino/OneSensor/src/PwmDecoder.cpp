@@ -29,18 +29,22 @@ bool PwmDecoder::update() {
     uint32_t highUs = pulseIn(_pin, HIGH, PULSE_TIMEOUT_US);
     uint32_t lowUs  = pulseIn(_pin, LOW,  PULSE_TIMEOUT_US);
 
-    // pulseIn() returns 0 on timeout or if no signal is present.
-    // A DC-HIGH or DC-LOW line gives highUs>0,lowUs=0 or vice versa.
-    // Treat both sub-components being non-zero as a valid reading.
-    if (highUs == 0 && lowUs == 0) {
-        // No signal at all — increment failure counter
-        if (_failCount < VALIDITY_WINDOW) _failCount++;
-        return false;
+    // pulseIn() returns 0 on timeout for DC static HIGH or static LOW signals.
+    if (highUs == 0 || lowUs == 0) {
+        if (digitalRead(_pin) == HIGH) {
+            _dutyCycle   = 100.0f;
+            _frequencyHz = 0.0f;
+            _failCount   = 0;
+            return true;
+        } else {
+            _dutyCycle   = 0.0f;
+            _frequencyHz = 0.0f;
+            _failCount   = 0;
+            return true;
+        }
     }
 
     uint32_t periodUs = highUs + lowUs;
-
-    // Guard: avoid divide-by-zero if one half is zero (DC line)
     if (periodUs == 0) {
         if (_failCount < VALIDITY_WINDOW) _failCount++;
         return false;

@@ -248,11 +248,11 @@
 
 | File | Created | Accurate |
 |---|---|---|
-| `docs/architecture.md` | ⬜ | ⬜ |
-| `docs/wiring.md` | ⬜ | ⬜ |
-| `docs/websocket-protocol.md` | ⬜ | ⬜ |
-| `docs/library-api.md` | ⬜ | ⬜ |
-| `docs/installation.md` | ⬜ | ⬜ |
-| `docs/troubleshooting.md` | ⬜ | ⬜ |
-| `docs/progress.md` | ⬜ | ⬜ |
-| `docs/decisions.md` | ⬜ | ⬜ |
+| `docs/architecture.md` | ✅ | ✅ |
+| `docs/wiring.md` | ✅ | ✅ |
+| `docs/websocket-protocol.md` | ✅ | ✅ |
+| `docs/library-api.md` | ✅ | ✅ |
+| `docs/installation.md` | ✅ | ✅ |
+| `docs/troubleshooting.md` | ✅ | ✅ |
+| `docs/progress.md` | ✅ | ✅ |
+| `docs/decisions.md` | ✅ | ✅ |
