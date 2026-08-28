@@ -160,3 +160,25 @@ Duty: 25.0%  →  Temp: 12.5°C  |  expect≈12.5°C  err=±0.00°C  (83 samples
 - normalizeValue() + LEDC duty math is correct
 - pulseIn() measurement error: ±0.01°C (100× better than ±1°C requirement)
 - ValueMapper round-trip verified end-to-end without Wi-Fi
+
+---
+
+## Phase 4 — OneSensor::readTemperature() API
+**Status:** ✅ VERIFIED — 2026-08-28
+
+### Serial output (Arduino side — BasicFiveSensors.ino)
+```
+Temp: 37.51 °C    ← readTemperature() working
+Humidity: nan %   ← not wired yet (Phase 5)
+Gas:      nan ppm ← not wired yet (Phase 5)
+Light:    nan lux ← not wired yet (Phase 5)
+Soil:     nan %   ← not wired yet (Phase 5)
+```
+
+### Verification
+- Compiled: 6672 bytes (20% flash), 474 bytes RAM (23%)
+- ESP32 on 37.5°C step (75% duty) → Arduino reads 37.51°C
+- Error: < 0.01°C  
+- `begin()`, `update()`, `readTemperature()` all work exactly as spec
+- `NaN` returned for unwired channels (correct — isValid() = false)
+- Phase 4 exit criterion: **PASS** ✅
