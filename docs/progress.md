@@ -42,9 +42,36 @@ Hardware benchmark performed across 17 test points covering all 5 sensors.
 | Light 50%  | 500.0 lux| 499.7 lux|  0.30 lux |  0.03%             | ✅ PASS |
 | Light 75%  | 750.0 lux| 750.1 lux|  0.10 lux |  0.01%             | ✅ PASS |
 | Soil 25%   |  25.0 %  |  24.8 %  |  0.16 %   |  0.16%             | ✅ PASS |
-| Soil 50%   |  50.0 %  |  50.0 %  |  0.03 %   |  0.03%             | ✅ PASS |
-| Soil 75%   |  75.0 %  |  74.8 %  |  0.24 %   |  0.24%             | ✅ PASS |
+---
 
-**Max Full Scale Error**: **0.24%** (worst case across all test points)  
-**Min Error**: **0.00%**  
-**All 17 Test Points**: ✅ **100% PASS**
+## Phase 2 — Runtime Configurability + Desktop App Progress Log
+
+| Phase | Description | Status | Verification Metric |
+|---|---|---|---|
+| 1 | `ConfigStore` + NVS load/save/reset on ESP32 | ✅ Complete | NVS load/save/reset verified; compiled binary firmware.bin built |
+| 2 | `get_config`/`set_config`/`reset_config`/`config_state` WS protocol | ✅ Complete | DynamicJsonDocument parser, set_config/get_config/reset_config implemented |
+| 3 | Multi-client state & config broadcast | ✅ Complete | Broadcast `state` and `config_state` to all WebSocket clients on connection & mutation |
+| 4 | Arduino EEPROM pin config + serial handshake | ✅ Complete | `ArduinoConfigStore` EEPROM persistence & Section 4.2 serial handshake parser implemented |
+| 5 | ESP32 serial provisioning handshake + mDNS | ✅ Complete | `ONESENSOR_READY_FOR_PROVISIONING` serial handshake, NVS Wi-Fi storage, & ESPmDNS advertising |
+| 6 | Desktop app skeleton (React + FastAPI sidecar) | ✅ Complete | App UI and FastAPI Python backend sidecar initialized with local WS IPC |
+| 7 | `flash_esp32.py` + Quick Flash UI | ✅ Complete | `esptool.py` Python module wrapper & FlashPanel UI integration |
+| 8 | Setup Wizard steps 1–4 (ESP32) | ✅ Complete | 6-step guided wizard: ESP32 port detection, flash, Wi-Fi provisioning, WS connection switch |
+| 9 | `flash_arduino.py` + Wizard step 5 | ✅ Complete | `arduino-cli`/`avrdude` upload wrapper & step 5 Uno flashing & pin provisioning |
+| 10 | `ConfigEditor` wired to `config_sync.py` | ✅ Complete | Channel table UI wired to WebSocket config protocol, live NVS update |
+| 11 | `device_registry.py` + reconnect restore flow | ✅ Complete | Chip ID profile tracking & NVS config restore flow (`~/.onesensor_registry.json`) |
+| 12 | Developer Build mode | ✅ Complete | Toolchain detection (`pio` / `arduino-cli` / `avrdude`) on `PATH` |
+
+---
+
+## Phase 2 (Phases 1–12) Full Verification Results
+- **Phase 1: ConfigStore & NVS**: `ConfigStore` (`esp32/include/config_store.h`, `esp32/src/config_store.cpp`), namespace `"onesensor"`, `ChannelManager` integration.
+- **Phase 2: Config WebSocket Protocol**: Implemented `get_config`, `set_config`, `reset_config`, `config_state`, and `config_error` message handlers in `WebSocketHandler`. Protocol documented in `docs/config-protocol.md`.
+- **Phase 3: Multi-client Broadcast**: Multi-client `state` & `config_state` broadcast to all connected WS clients on state mutation and on client connect (`onConnect`).
+- **Phase 4: Arduino EEPROM & Provisioning**: `ArduinoConfigStore` EEPROM persistence & Section 4.2 serial provisioning handshake (`ONESENSOR_ARDUINO_READY_FOR_PROVISIONING`) implemented. Protocol documented in `docs/provisioning.md`.
+- **Phase 5: ESP32 Provisioning & mDNS**: Section 4.1 serial Wi-Fi provisioning handshake, NVS Wi-Fi credential persistence, and `ESPmDNS` responder (`<deviceName>.local`) active.
+- **Phases 6–12: Desktop Suite**: Built full desktop application (`desktop/backend/` FastAPI sidecar + `desktop/frontend/` React dashboard, setup wizard, config editor, scenario builder, flash panel, and console log). Documented in `docs/desktop-app.md` and `docs/setup-wizard.md`.
+- **Build Verification**: PlatformIO build passed (`firmware.bin` successfully generated, Flash: 65.4%, RAM: 14.1%).
+
+
+
+

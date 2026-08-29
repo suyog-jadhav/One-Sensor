@@ -35,8 +35,9 @@ enum class SensorType {
 };
 
 enum class SignalType {
-    PWM
-    // Future: DAC, UART, I2C, SPI
+    PWM,
+    DAC
+    // Future: UART, I2C, SPI
     // Adding a new SignalType requires a new ChannelManager strategy only —
     // sensor classes and SensorState remain unchanged.
 };
@@ -46,43 +47,41 @@ enum class SignalType {
 struct ChannelConfig {
     SensorType  sensor;
     SignalType  signal;
-    uint8_t     gpio;           // ESP32 output GPIO pin
-    uint8_t     ledcChannel;    // LEDC hardware channel index (0–15)
-    uint32_t    frequencyHz;    // PWM carrier frequency
-    uint8_t     resolutionBits; // LEDC duty resolution (e.g. 10 = 0..1023)
+    uint8_t     gpio;           // ESP32 output GPIO pin (PWM pin or DAC pin 25/26)
+    uint8_t     ledcChannel;    // LEDC hardware channel index (0–15, ignored for DAC)
+    uint32_t    frequencyHz;    // PWM carrier frequency (ignored for DAC)
+    uint8_t     resolutionBits; // LEDC duty resolution (e.g. 10 = 0..1023, ignored for DAC)
     float       inputMin;       // Logical sensor minimum (e.g. 0.0 °C)
     float       inputMax;       // Logical sensor maximum (e.g. 50.0 °C)
     float       defaultValue;   // Value output at boot before any WebSocket command
+    float       calOffset;      // Calibration offset (default 0.0f)
+    float       calScale;       // Calibration scale factor (default 1.0f)
 };
 
 // ─── Active Channel Table ─────────────────────────────────────────────────────
-//
-// Phase 1: Only TEMPERATURE channel is active (one wire to verify end-to-end).
-// Phase 5: Uncomment/add the remaining four channels.
-//
-// Wiring used during development (change here if you rewire — nowhere else):
-//   Temperature  → ESP32 GPIO16  →  Arduino D2
-//   Humidity     → ESP32 GPIO17  →  Arduino D3
-//   Gas          → ESP32 GPIO18  →  Arduino D4
-//   Light        → ESP32 GPIO19  →  Arduino D5
-//   Soil         → ESP32 GPIO21  →  Arduino D6
-//   GND          → GND shared between both boards (REQUIRED)
 
-static const ChannelConfig CHANNEL_TABLE[] = {
-    //  sensor               signal        gpio  ledcCh  freq    bits  min    max    default
-    {  SensorType::TEMPERATURE, SignalType::PWM,  16,    0,   500,    10,   0.0f,  50.0f,  25.0f },  // Phase 1+
-    {  SensorType::HUMIDITY,    SignalType::PWM,  17,    1,   500,    10,   0.0f, 100.0f,  50.0f },  // Phase 5+
-    {  SensorType::GAS,         SignalType::PWM,  18,    2,   500,    10,   0.0f,1000.0f, 300.0f },  // Phase 5+
-    {  SensorType::LIGHT,       SignalType::PWM,  19,    3,   500,    10,   0.0f,1000.0f, 500.0f },  // Phase 5+
-    {  SensorType::SOIL_MOISTURE,SignalType::PWM, 21,    4,   500,    10,   0.0f, 100.0f,  50.0f },  // Phase 5+
+static const uint8_t MAX_CHANNELS = 5;
+
+static const ChannelConfig DEFAULT_CHANNEL_TABLE[MAX_CHANNELS] = {
+    //  sensor               signal        gpio  ledcCh  freq    bits  min    max    default calOff calScale
+    {  SensorType::TEMPERATURE, SignalType::DAC,  25,    0,   500,    10,   0.0f,  50.0f,  25.0f,  0.0f,   1.0f },  // Hardware DAC1 (GPIO25 -> A0)
+    {  SensorType::HUMIDITY,    SignalType::DAC,  26,    1,   500,    10,   0.0f, 100.0f,  50.0f,  0.0f,   1.0f },  // Hardware DAC2 (GPIO26 -> A1)
+    {  SensorType::GAS,         SignalType::PWM,  18,    2,   500,    10,   0.0f,1000.0f, 300.0f,  0.0f,   1.0f },  // LEDC PWM (GPIO18 -> D4)
+    {  SensorType::LIGHT,       SignalType::PWM,  19,    3,   500,    10,   0.0f,1000.0f, 500.0f,  0.0f,   1.0f },  // LEDC PWM (GPIO19 -> D5)
+    {  SensorType::SOIL_MOISTURE,SignalType::PWM, 21,    4,   500,    10,   0.0f, 100.0f,  50.0f,  0.0f,   1.0f },  // LEDC PWM (GPIO21 -> D6)
 };
 
-static const uint8_t CHANNEL_COUNT = sizeof(CHANNEL_TABLE) / sizeof(CHANNEL_TABLE[0]);
+static const ChannelConfig* const CHANNEL_TABLE = DEFAULT_CHANNEL_TABLE;
+static const uint8_t CHANNEL_COUNT = MAX_CHANNELS;
 
-// ─── Valid GPIO Pool ──────────────────────────────────────────────────────────
+// ─── Valid GPIO Pools ─────────────────────────────────────────────────────────
 // GPIOs safe for PWM output on ESP32-WROOM-32.
-// Startup validation checks every configured GPIO against this list.
 static const uint8_t VALID_PWM_GPIOS[] = {
     4, 5, 12, 13, 14, 15, 16, 17, 18, 19, 21, 22, 23, 25, 26, 27, 32, 33
 };
 static const uint8_t VALID_PWM_GPIO_COUNT = sizeof(VALID_PWM_GPIOS) / sizeof(VALID_PWM_GPIOS[0]);
+
+// ESP32 hardware DAC pins (8-bit output 0–3.3V)
+static const uint8_t VALID_DAC_GPIOS[] = { 25, 26 };
+static const uint8_t VALID_DAC_GPIO_COUNT = sizeof(VALID_DAC_GPIOS) / sizeof(VALID_DAC_GPIOS[0]);
+

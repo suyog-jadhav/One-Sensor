@@ -11,6 +11,7 @@
 #include "sensor_state.h"
 #include "value_mapper.h"
 #include "channel_manager.h"
+#include "config_store.h"
 #include "wifi_manager.h"
 #include "http_server.h"
 #include "scenario_engine.h"
@@ -33,11 +34,14 @@ void setup() {
     delay(500);
 
     Serial.println(F("\n========================================"));
-    Serial.println(F("  OneSensor ESP32 Firmware — Phase 11"));
-    Serial.println(F("  Scenario Engine (STATIC + RAMP) Active"));
+    Serial.println(F("  OneSensor ESP32 Firmware — Phase 2"));
+    Serial.println(F("  ConfigStore & NVS Persistence Active"));
     Serial.println(F("========================================"));
 
-    // 1. PWM first — independent of network
+    // 0. ConfigStore NVS initialization
+    gConfigStore.begin();
+
+    // 1. Hardware channels (LEDC PWM + DAC) — independent of network
     if (!gChannelManager.begin()) {
         Serial.println(F("[FATAL] Channel init failed. Halting."));
         while (true) { delay(1000); }

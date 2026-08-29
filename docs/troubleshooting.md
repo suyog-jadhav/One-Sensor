@@ -39,5 +39,10 @@ failures; the sketch can skip printing for invalid channels.
 | Duty reads ~100% always | DC-HIGH line — pulseIn measuring only one phase | Check `lowUs` in PwmDecoder; verify both edges are present |
 | Readings erratic / noisy | Wires too long, or no common ground | Shorten wires; verify GND jumper |
 | `ChannelManager] ERROR: GPIO xx assigned to both...` | Duplicate GPIO in `hardware_config.h` | Fix the config table |
-| ESP32 doesn't connect to Wi-Fi | Wrong SSID/password in secrets.h | Re-check secrets.h; verify 2.4 GHz network |
 | WebSocket connects then drops | ESP32 rebooting (stack overflow, watchdog) | Check Serial for crash dump; reduce stack usage |
+| Board not detected in Setup Wizard | USB cable power-only, missing driver, or wrong port | Verify USB data cable; install CP2102/CH340 driver; select port manually |
+| Provisioning `auth_timeout` | Incorrect Wi-Fi password or weak signal | Re-enter Wi-Fi credentials in Step 3; ensure 2.4 GHz Wi-Fi signal is strong |
+| mDNS `.local` address unresolvable | Router multicast blocking or OS mDNS service disabled | Fall back to IP address displayed in Serial log or Setup Wizard Step 4 |
+| Toolchain not found | PlatformIO or arduino-cli not installed on system PATH | Install PlatformIO/arduino-cli for Developer Build mode, or use Quick Flash prebuilt binaries |
+| Serial provisioning plaintext | USB serial transmission of Wi-Fi credentials | Expected behavior; USB transport is physically local |
+

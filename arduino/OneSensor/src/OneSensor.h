@@ -26,7 +26,10 @@
 
 #include <Arduino.h>
 #include "ArduinoChannelConfig.h"
+#include "ArduinoConfigStore.h"
+#include "SignalDecoder.h"
 #include "PwmDecoder.h"
+#include "DacDecoder.h"
 #include "TemperatureSensor.h"
 #include "HumiditySensor.h"
 #include "GasSensor.h"
@@ -38,15 +41,14 @@ public:
     OneSensor();
 
     /**
-     * Initialise all decoders using the pin table in ArduinoChannelConfig.h.
+     * Initialise all decoders using EEPROM config or compiled defaults.
+     * Prints ONESENSOR_ARDUINO_READY_FOR_PROVISIONING over Serial.
      * Call once in setup().
      */
     void begin();
 
     /**
-     * Call every loop() iteration. Runs one pulseIn() measurement per channel
-     * in round-robin order. Each call blocks for at most PwmDecoder::PULSE_TIMEOUT_US
-     * per active channel — at 5 channels × 25 ms = 125 ms worst case.
+     * Call every loop() iteration. Runs signal updates for all channels and checks for serial provisioning commands.
      */
     void update();
 
@@ -74,10 +76,12 @@ public:
     bool isValid(SensorType sensor) const;
 
 private:
-    // One PwmDecoder per channel
-    PwmDecoder _decoders[ARDUINO_CHANNEL_COUNT];
+    ArduinoChannelConfig _channels[ARDUINO_CHANNEL_COUNT];
+    PwmDecoder _pwmDecoders[ARDUINO_CHANNEL_COUNT];
+    DacDecoder _dacDecoders[ARDUINO_CHANNEL_COUNT];
+    SignalDecoder* _decoders[ARDUINO_CHANNEL_COUNT];
 
-    // Sensor classes — each holds a pointer to its decoder
+    // Sensor classes — each holds a pointer to its decoder interface
     TemperatureSensor   _tempSensor;
     HumiditySensor      _humSensor;
     GasSensor           _gasSensor;
@@ -85,8 +89,13 @@ private:
     SoilMoistureSensor  _soilSensor;
 
     // Helper to find the decoder for a given SensorType
-    PwmDecoder* _decoderFor(SensorType sensor);
-    const PwmDecoder* _decoderFor(SensorType sensor) const;
+    SignalDecoder* _decoderFor(SensorType sensor);
+    const SignalDecoder* _decoderFor(SensorType sensor) const;
+
+    void _reinitDecoders();
+    bool _parseAndApplyProvisioning(const String& line, String& errReason);
+    void _checkSerialCommands();
 
     bool _initialized;
 };
+

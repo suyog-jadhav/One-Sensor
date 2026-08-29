@@ -30,22 +30,28 @@ enum class SensorType : uint8_t {
     SOIL_MOISTURE = 4
 };
 
+enum class SignalType : uint8_t {
+    PWM = 0,
+    DAC = 1
+};
+
 // ─── Per-channel config ────────────────────────────────────────────────────
 struct ArduinoChannelConfig {
     SensorType  sensor;
-    uint8_t     pin;        // Arduino digital pin receiving PWM
+    SignalType  signal;     // PWM or DAC
+    uint8_t     pin;        // Arduino digital pin (for PWM) or analog pin (for DAC e.g. A0)
     float       outputMin;  // Logical sensor minimum (e.g. 0.0 °C)
     float       outputMax;  // Logical sensor maximum (e.g. 50.0 °C)
 };
 
 // ─── Pin assignment table ──────────────────────────────────────────────────
 static const ArduinoChannelConfig ARDUINO_CHANNEL_TABLE[] = {
-    //  sensor                    pin   outMin   outMax
-    {  SensorType::TEMPERATURE,    2,   0.0f,    50.0f  },   // Phase 2+
-    {  SensorType::HUMIDITY,       3,   0.0f,   100.0f  },   // Phase 5+
-    {  SensorType::GAS,            4,   0.0f,  1000.0f  },   // Phase 5+
-    {  SensorType::LIGHT,          5,   0.0f,  1000.0f  },   // Phase 5+
-    {  SensorType::SOIL_MOISTURE,  6,   0.0f,   100.0f  },   // Phase 5+
+    //  sensor                    signal           pin   outMin   outMax
+    {  SensorType::TEMPERATURE,    SignalType::DAC,  A0,  0.0f,    50.0f  },   // Hardware DAC1 (ESP32 GPIO25 -> Arduino A0)
+    {  SensorType::HUMIDITY,       SignalType::DAC,  A1,  0.0f,   100.0f  },   // Hardware DAC2 (ESP32 GPIO26 -> Arduino A1)
+    {  SensorType::GAS,            SignalType::PWM,  4,   0.0f,  1000.0f  },   // PWM (ESP32 GPIO18 -> Arduino D4)
+    {  SensorType::LIGHT,          SignalType::PWM,  5,   0.0f,  1000.0f  },   // PWM (ESP32 GPIO19 -> Arduino D5)
+    {  SensorType::SOIL_MOISTURE,  SignalType::PWM,  6,   0.0f,   100.0f  },   // PWM (ESP32 GPIO21 -> Arduino D6)
 };
 
 static const uint8_t ARDUINO_CHANNEL_COUNT =
