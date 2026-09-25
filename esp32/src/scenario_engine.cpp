@@ -18,6 +18,13 @@ uint8_t ScenarioEngine::_typeToIndex(SensorType type) const {
         case SensorType::GAS:           return 2;
         case SensorType::LIGHT:         return 3;
         case SensorType::SOIL_MOISTURE: return 4;
+        case SensorType::MOTION_X:      return 5;
+        case SensorType::MOTION_Y:      return 6;
+        case SensorType::MOTION_Z:      return 7;
+        case SensorType::PROXIMITY:     return 8;
+        case SensorType::SOUND:         return 9;
+        case SensorType::UV:            return 10;
+        case SensorType::CO2:           return 11;
         default:                        return 0;
     }
 }

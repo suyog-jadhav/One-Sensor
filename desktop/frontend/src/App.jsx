@@ -1,18 +1,34 @@
 import React, { useState, useEffect, useRef } from 'react';
+import Badge from './components/Badge';
 import LiveControl from './components/LiveControl';
 import ConfigEditor from './components/ConfigEditor';
 import ScenarioBuilder from './components/ScenarioBuilder';
 import FlashPanel from './components/FlashPanel';
 import SetupWizard from './components/SetupWizard';
 import ConsoleLog from './components/ConsoleLog';
+import { Activity, Sliders, TrendingUp, Zap, HelpCircle, Terminal, Cpu, Radio } from 'lucide-react';
 
 const API_BASE = 'http://127.0.0.1:8000';
 const WS_URL = 'ws://127.0.0.1:8000/ws';
 
+const TABS = [
+  { id: 'live', label: 'Live Control', sub: 'Transducers', icon: Activity },
+  { id: 'config', label: 'Config Editor', sub: 'Pin Matrix', icon: Sliders },
+  { id: 'scenario', label: 'Scenario Builder', sub: 'Waveforms', icon: TrendingUp },
+  { id: 'flash', label: 'Flash Panel', sub: 'Bootloader', icon: Zap },
+  { id: 'wizard', label: 'Setup Wizard', sub: 'Provisioning', icon: HelpCircle },
+  { id: 'logs', label: 'Console & Serial', sub: 'Telemetry', icon: Terminal },
+];
+
 export default function App() {
   const [activeTab, setActiveTab] = useState('live');
   const [isConnected, setIsConnected] = useState(false);
-  const [sensorState, setSensorState] = useState({ temperature: 25, humidity: 50, gas: 500, light: 500, soil: 50 });
+  const [sensorState, setSensorState] = useState({
+    temperature: 25, humidity: 50, gas: 300, light: 500, soil: 50,
+    motionX: 0, motionY: 0, motionZ: 1,
+    proximity: 50, sound: 40, uv: 2, co2: 420,
+    faults: {}
+  });
   const [configState, setConfigState] = useState({ channels: [] });
   const [configError, setConfigError] = useState(null);
   const [ports, setPorts] = useState([]);
@@ -44,7 +60,7 @@ export default function App() {
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          
+
           if (data.type === 'state') {
             setSensorState(data);
           } else if (data.type === 'config_state') {
@@ -111,12 +127,23 @@ export default function App() {
 
   const handleSetValue = (sensor, value) => {
     const key = (sensor === 'soil_moisture' || sensor === 'soil') ? 'soil' : sensor;
-    setSensorState(prev => ({
-      ...prev,
-      [key]: value,
-      [sensor]: value
-    }));
+    setSensorState(prev => ({ ...prev, [key]: value, [sensor]: value }));
     sendWS({ type: 'set', sensor, value });
+  };
+
+  const handleSetMotion = (x, y, z) => {
+    setSensorState(prev => ({ ...prev, motionX: x, motionY: y, motionZ: z }));
+    sendWS({ type: 'motion', x, y, z });
+  };
+
+  const handleInjectFault = (sensor, faultType, magnitude = 0, durationMs = 0, latencyMs = 0) => {
+    sendWS({ type: 'fault', sensor, fault: faultType, magnitude, durationMs, latencyMs });
+    addLog(`Fault injected [${faultType}] on ${sensor} (magnitude=${magnitude}, dur=${durationMs}ms)`, 'warning');
+  };
+
+  const handleClearFault = (sensor = 'all') => {
+    sendWS({ type: 'fault_clear', sensor });
+    addLog(`Fault cleared: ${sensor}`, 'info');
   };
 
   const handleConnectESP32 = async (ip) => {
@@ -275,52 +302,75 @@ export default function App() {
   };
 
   return (
-    <div>
-      {/* Top Header */}
+    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', backgroundColor: 'var(--bg-main)' }}>
+      {/* ── Top Header ── */}
       <header className="app-header">
+        {/* Brand Block */}
         <div className="brand">
-          <div className="brand-icon">🌿</div>
+          <div className="brand-icon">
+            <Radio size={20} color="#fff" />
+          </div>
           <div className="brand-text">
-            <h1>OneSensor Control Suite</h1>
-            <p>Virtual Sensor Platform • Desktop Edition</p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <h1>OneSensor Control Suite</h1>
+              <Badge variant="neutral" size="sm">v2.0.0</Badge>
+            </div>
+            <p>PRECISION MULTI-CHANNEL TRANSDUCER EMULATOR</p>
           </div>
         </div>
 
-        {/* Tab Navigation */}
+        {/* Tab Navigation (6 two-line pill buttons with sliding indicator) */}
         <nav className="nav-tabs">
-          <button className={`tab-btn ${activeTab === 'live' ? 'active' : ''}`} onClick={() => setActiveTab('live')}>
-            Live Control
-          </button>
-          <button className={`tab-btn ${activeTab === 'config' ? 'active' : ''}`} onClick={() => setActiveTab('config')}>
-            Config Editor
-          </button>
-          <button className={`tab-btn ${activeTab === 'scenario' ? 'active' : ''}`} onClick={() => setActiveTab('scenario')}>
-            Scenario Builder
-          </button>
-          <button className={`tab-btn ${activeTab === 'flash' ? 'active' : ''}`} onClick={() => setActiveTab('flash')}>
-            Flash Panel
-          </button>
-          <button className={`tab-btn ${activeTab === 'wizard' ? 'active' : ''}`} onClick={() => setActiveTab('wizard')}>
-            Setup Wizard
-          </button>
-          <button className={`tab-btn ${activeTab === 'logs' ? 'active' : ''}`} onClick={() => setActiveTab('logs')}>
-            Console & Serial
-          </button>
+          {TABS.map(tab => {
+            const isActive = activeTab === tab.id;
+            const Icon = tab.icon;
+            return (
+              <button
+                key={tab.id}
+                className={`tab-btn ${isActive ? 'active' : ''}`}
+                onClick={() => setActiveTab(tab.id)}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Icon size={14} />
+                  <span>{tab.label}</span>
+                </div>
+                <span style={{ fontSize: '10px', opacity: isActive ? 0.9 : 0.6, fontFamily: 'var(--font-mono)' }}>
+                  {tab.sub}
+                </span>
+              </button>
+            );
+          })}
         </nav>
 
-        {/* Status Indicator */}
-        <div className="status-badge">
-          <div className={`status-dot ${isConnected ? 'connected' : 'disconnected'}`}></div>
-          <span>{isConnected ? 'Backend Connected' : 'Disconnected'}</span>
+        {/* Connection Status Badge (Dot + two-line telemetry with crossfade) */}
+        <div
+          className="status-badge"
+          style={{
+            background: isConnected ? 'rgba(16, 185, 129, 0.08)' : 'rgba(239, 68, 68, 0.08)',
+            borderColor: isConnected ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)',
+          }}
+        >
+          <div className={`status-dot ${isConnected ? 'connected' : 'disconnected'}`} />
+          <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'left', lineHeight: '1.2' }}>
+            <span style={{ color: isConnected ? '#34d399' : '#f87171', fontWeight: '700', fontSize: '11px', fontFamily: 'var(--font-mono)' }}>
+              {isConnected ? 'BACKEND LINKED' : 'SIDECAR OFFLINE'}
+            </span>
+            <span style={{ fontSize: '10px', color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>
+              {isConnected ? 'PORT 8000 WS OK' : 'RECONNECTING…'}
+            </span>
+          </div>
         </div>
       </header>
 
-      {/* Main Content Area */}
-      <main className="main-container">
+      {/* ── Main Content Area (Crossfade tab content, pauses inactive tabs) ── */}
+      <main className="main-container" style={{ flex: 1 }}>
         {activeTab === 'live' && (
           <LiveControl
             state={sensorState}
             onSetValue={handleSetValue}
+            onSetMotion={handleSetMotion}
+            onInjectFault={handleInjectFault}
+            onClearFault={handleClearFault}
             onConnectESP32={handleConnectESP32}
           />
         )}
@@ -338,6 +388,8 @@ export default function App() {
             onStartStatic={handleStartStatic}
             onStopScenario={handleStopScenario}
             onStopAll={handleStopAllScenarios}
+            onInjectFault={handleInjectFault}
+            onClearFault={handleClearFault}
           />
         )}
         {activeTab === 'flash' && (
@@ -369,7 +421,18 @@ export default function App() {
           />
         )}
       </main>
+
+      {/* ── Footer Diagnostics Bar ── */}
+      <footer className="app-footer">
+        <div className="footer-telemetry">
+          <span>SESSION: <strong>0x4F1A</strong></span>
+          <span>BAUD: <strong>115200 8N1</strong></span>
+          <span>CORE: <strong>v2.0-SYNTH</strong></span>
+        </div>
+        <div>
+          <span>ONESENSOR DESKTOP CONTROL SUITE • v2.0.0</span>
+        </div>
+      </footer>
     </div>
   );
-
 }

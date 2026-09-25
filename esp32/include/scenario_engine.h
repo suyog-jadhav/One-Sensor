@@ -113,7 +113,7 @@ public:
     bool isRunning(SensorType type) const;
 
 private:
-    static constexpr uint8_t MAX_SCENARIOS = 5;
+    static constexpr uint8_t MAX_SCENARIOS = 12;
     Scenario* _scenarios[MAX_SCENARIOS] = {nullptr};
 
     uint8_t _typeToIndex(SensorType type) const;

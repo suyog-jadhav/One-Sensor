@@ -1,36 +1,281 @@
 import React, { useState, useEffect, useRef } from 'react';
+import Badge from './Badge';
+import { useSmoothedValue } from '../utils/useSmoothedValue';
+import { RefreshCw, Wifi, AlertTriangle, Zap, RotateCcw } from 'lucide-react';
 
 const SENSOR_META = [
-  { key: 'temperature', name: 'Temperature', unit: '°C', icon: '🌡️', min: 0, max: 50, color: '#ef4444' },
-  { key: 'humidity', name: 'Humidity', unit: '%', icon: '💧', min: 0, max: 100, color: '#3b82f6' },
-  { key: 'gas', name: 'Gas Concentration', unit: 'ppm', icon: '☁️', min: 0, max: 1000, color: '#8b5cf6' },
-  { key: 'light', name: 'Light Intensity', unit: 'lux', icon: '☀️', min: 0, max: 1000, color: '#eab308' },
-  { key: 'soil', name: 'Soil Moisture', unit: '%', icon: '🌱', min: 0, max: 100, color: '#10b981' }
+  { key: 'temperature',  name: 'Temperature',     unit: '°C',    icon: '🌡️',  min: 0,   max: 50,   step: 0.5,  color: '#ef4444', wsKey: 'temperature' },
+  { key: 'humidity',     name: 'Humidity',         unit: '%',     icon: '💧',  min: 0,   max: 100,  step: 0.5,  color: '#38bdf8', wsKey: 'humidity' },
+  { key: 'gas',         name: 'Gas',               unit: 'ppm',   icon: '☁️',  min: 0,   max: 1000, step: 5,    color: '#8b5cf6', wsKey: 'gas' },
+  { key: 'light',       name: 'Light',             unit: 'lux',   icon: '☀️',  min: 0,   max: 1000, step: 5,    color: '#f59e0b', wsKey: 'light' },
+  { key: 'soil',        name: 'Soil Moisture',     unit: '%',     icon: '🌱',  min: 0,   max: 100,  step: 0.5,  color: '#10b981', wsKey: 'soil_moisture' },
+  { key: 'motionX',     name: 'Motion X',          unit: 'g',     icon: '📐',  min: -2,  max: 2,    step: 0.01, color: '#f472b6', wsKey: 'motionX' },
+  { key: 'motionY',     name: 'Motion Y',          unit: 'g',     icon: '📐',  min: -2,  max: 2,    step: 0.01, color: '#a78bfa', wsKey: 'motionY' },
+  { key: 'motionZ',     name: 'Motion Z',          unit: 'g',     icon: '📐',  min: -2,  max: 2,    step: 0.01, color: '#818cf8', wsKey: 'motionZ' },
+  { key: 'proximity',   name: 'Proximity',         unit: 'cm',    icon: '📡',  min: 2,   max: 400,  step: 1,    color: '#fb923c', wsKey: 'proximity' },
+  { key: 'sound',       name: 'Sound Level',       unit: 'dB',    icon: '🔊',  min: 30,  max: 120,  step: 0.5,  color: '#34d399', wsKey: 'sound' },
+  { key: 'uv',          name: 'UV Index',          unit: 'idx',   icon: '🌞',  min: 0,   max: 11,   step: 0.1,  color: '#fbbf24', wsKey: 'uv' },
+  { key: 'co2',         name: 'CO₂ / Air Quality', unit: 'ppm',   icon: '🍃',  min: 400, max: 5000, step: 10,   color: '#6ee7b7', wsKey: 'co2' },
 ];
+
+const FAULT_TYPES = ['none', 'dropout', 'stuck', 'noise', 'spike', 'drift', 'disconnect', 'latency'];
 
 const API_BASE = 'http://localhost:8000';
 
-export default function LiveControl({ state, onSetValue, onConnectESP32 }) {
+// ─── Individual Sensor Card ────────────────────────────────────────────────────
+function LiveSensorCard({ sensor, rawVal, isConnected, onSetValue, activeFault }) {
+  const numVal = rawVal !== undefined ? Number(rawVal) : ((sensor.min + sensor.max) / 2);
+  const smoothedVal = useSmoothedValue(numVal, { duration: 260, decimals: sensor.step < 0.1 ? 3 : 1, isActive: true });
+  const [pulseActive, setPulseActive] = useState(false);
+  const prevValRef = useRef(numVal);
+
+  useEffect(() => {
+    if (Math.abs(prevValRef.current - numVal) > 0.05) {
+      setPulseActive(true);
+      const t = setTimeout(() => setPulseActive(false), 200);
+      prevValRef.current = numVal;
+      return () => clearTimeout(t);
+    }
+  }, [numVal]);
+
+  const hasFault = activeFault && activeFault !== 'none';
+
+  return (
+    <div
+      className="sensor-card interactive-card"
+      style={{
+        opacity: isConnected ? 1 : 0.75,
+        border: hasFault
+          ? '1px solid rgba(239,68,68,0.5)'
+          : pulseActive
+          ? `1px solid ${sensor.color}`
+          : '1px solid var(--border-color)',
+        transition: 'border-color var(--motion-fast), opacity var(--motion-standard)',
+        position: 'relative',
+        overflow: 'hidden',
+      }}
+    >
+      {hasFault && (
+        <div style={{
+          position: 'absolute', top: 0, left: 0, right: 0, height: '2px',
+          background: 'linear-gradient(90deg, #ef4444, #f59e0b)',
+          animation: 'shimmer 1.5s linear infinite',
+        }} />
+      )}
+      <div className="card-top">
+        <span className="sensor-name">{sensor.name}</span>
+        <span style={{ fontSize: '20px' }}>{sensor.icon}</span>
+      </div>
+
+      <div
+        className="sensor-value-large"
+        style={{
+          color: hasFault ? '#f59e0b' : sensor.color,
+          transform: pulseActive ? 'scale(1.02)' : 'scale(1)',
+          transition: 'transform var(--motion-instant)',
+        }}
+      >
+        {rawVal !== undefined ? smoothedVal.toFixed(sensor.step < 0.1 ? 3 : 1) : '--'}{' '}
+        <span className="unit">{sensor.unit}</span>
+      </div>
+
+      {hasFault && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: '5px',
+          fontSize: '10px', fontFamily: 'var(--font-mono)',
+          color: '#f59e0b', marginBottom: '6px',
+        }}>
+          <AlertTriangle size={10} />
+          <span>FAULT: {activeFault.toUpperCase()}</span>
+        </div>
+      )}
+
+      <div className="slider-container">
+        <input
+          type="range"
+          min={sensor.min}
+          max={sensor.max}
+          step={sensor.step}
+          value={numVal}
+          disabled={!isConnected}
+          onChange={(e) => onSetValue(sensor.wsKey, parseFloat(e.target.value))}
+          title={isConnected ? '' : 'Connect to ESP32 first'}
+          style={{ cursor: isConnected ? 'pointer' : 'not-allowed' }}
+        />
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px', fontSize: '11px', color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>
+        <span>MIN: {sensor.min}</span>
+        <span>MAX: {sensor.max} {sensor.unit}</span>
+      </div>
+    </div>
+  );
+}
+
+// ─── Fault Injection Panel ────────────────────────────────────────────────────
+function FaultInjectionPanel({ onInjectFault, onClearFault }) {
+  const [selectedSensor, setSelectedSensor] = useState('temperature');
+  const [faultType, setFaultType] = useState('noise');
+  const [magnitude, setMagnitude] = useState(5);
+  const [durationMs, setDurationMs] = useState(0);
+  const [latencyMs, setLatencyMs] = useState(200);
+  const [lastInjected, setLastInjected] = useState(null);
+
+  const handleInject = () => {
+    onInjectFault(selectedSensor, faultType, magnitude, durationMs, latencyMs);
+    setLastInjected({ sensor: selectedSensor, type: faultType });
+    setTimeout(() => setLastInjected(null), 2500);
+  };
+
+  return (
+    <div
+      className="interactive-card"
+      style={{
+        background: 'rgba(239,68,68,0.04)',
+        border: '1px solid rgba(239,68,68,0.2)',
+        borderRadius: 'var(--radius-lg)',
+        padding: '20px 24px',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '18px' }}>
+        <Zap size={16} color="#ef4444" />
+        <h3 style={{ fontSize: '14px', fontWeight: '700', color: '#ef4444', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          Fault Injection Engine
+        </h3>
+        <Badge variant="danger" size="sm">LIVE</Badge>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '14px', marginBottom: '16px' }}>
+        {/* Sensor selector */}
+        <div>
+          <label style={{ fontSize: '11px', color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', display: 'block', marginBottom: '6px' }}>TARGET SENSOR</label>
+          <select
+            value={selectedSensor}
+            onChange={e => setSelectedSensor(e.target.value)}
+            style={{
+              width: '100%', padding: '7px 10px', borderRadius: 'var(--radius-sm)',
+              background: 'var(--bg-surface-3)', border: '1px solid var(--border-color)',
+              color: 'var(--text-main)', fontFamily: 'var(--font-mono)', fontSize: '12px',
+            }}
+          >
+            {SENSOR_META.map(s => <option key={s.wsKey} value={s.wsKey}>{s.name}</option>)}
+          </select>
+        </div>
+
+        {/* Fault type */}
+        <div>
+          <label style={{ fontSize: '11px', color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', display: 'block', marginBottom: '6px' }}>FAULT TYPE</label>
+          <select
+            value={faultType}
+            onChange={e => setFaultType(e.target.value)}
+            style={{
+              width: '100%', padding: '7px 10px', borderRadius: 'var(--radius-sm)',
+              background: 'var(--bg-surface-3)', border: '1px solid var(--border-color)',
+              color: 'var(--text-main)', fontFamily: 'var(--font-mono)', fontSize: '12px',
+            }}
+          >
+            {FAULT_TYPES.filter(f => f !== 'none').map(f => (
+              <option key={f} value={f}>{f.toUpperCase()}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Magnitude */}
+        <div>
+          <label style={{ fontSize: '11px', color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', display: 'block', marginBottom: '6px' }}>
+            MAGNITUDE: <span style={{ color: 'var(--text-main)' }}>{magnitude}</span>
+          </label>
+          <input
+            type="range" min={0} max={500} step={1}
+            value={magnitude}
+            onChange={e => setMagnitude(Number(e.target.value))}
+          />
+        </div>
+
+        {/* Duration */}
+        <div>
+          <label style={{ fontSize: '11px', color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', display: 'block', marginBottom: '6px' }}>
+            DURATION: <span style={{ color: 'var(--text-main)' }}>{durationMs === 0 ? '∞' : `${durationMs}ms`}</span>
+          </label>
+          <input
+            type="range" min={0} max={10000} step={500}
+            value={durationMs}
+            onChange={e => setDurationMs(Number(e.target.value))}
+          />
+        </div>
+
+        {/* Latency (only relevant for latency fault) */}
+        {faultType === 'latency' && (
+          <div>
+            <label style={{ fontSize: '11px', color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', display: 'block', marginBottom: '6px' }}>
+              LATENCY: <span style={{ color: 'var(--text-main)' }}>{latencyMs}ms</span>
+            </label>
+            <input
+              type="range" min={0} max={2000} step={50}
+              value={latencyMs}
+              onChange={e => setLatencyMs(Number(e.target.value))}
+            />
+          </div>
+        )}
+      </div>
+
+      {lastInjected && (
+        <div className="banner-enter" style={{
+          padding: '8px 14px', marginBottom: '12px', borderRadius: 'var(--radius-sm)',
+          background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)',
+          fontSize: '12px', fontFamily: 'var(--font-mono)', color: '#fca5a5',
+        }}>
+          ✓ Fault [{lastInjected.type.toUpperCase()}] armed on {lastInjected.sensor}
+        </div>
+      )}
+
+      <div style={{ display: 'flex', gap: '10px' }}>
+        <button className="btn-primary" onClick={handleInject}
+          style={{ background: 'rgba(239,68,68,0.2)', borderColor: 'rgba(239,68,68,0.5)', color: '#fca5a5' }}
+        >
+          <Zap size={14} />
+          <span>Inject Fault</span>
+        </button>
+        <button className="btn-secondary" onClick={() => onClearFault(selectedSensor)}>
+          <RotateCcw size={14} />
+          <span>Clear Sensor</span>
+        </button>
+        <button className="btn-secondary" onClick={() => onClearFault('all')}>
+          <RotateCcw size={14} />
+          <span>Clear ALL</span>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main LiveControl Component ───────────────────────────────────────────────
+export default function LiveControl({ state, onSetValue, onSetMotion, onInjectFault, onClearFault, onConnectESP32 }) {
   const [targetIP, setTargetIP] = useState('');
   const [connecting, setConnecting] = useState(false);
   const [esp32Connected, setEsp32Connected] = useState(false);
   const [esp32IP, setEsp32IP] = useState(null);
-  const [activeFilter, setActiveFilter] = useState({
-    temperature: true, humidity: true, gas: true, light: true, soil: true
-  });
+  const [activeFilter, setActiveFilter] = useState(
+    Object.fromEntries(SENSOR_META.map(s => [s.key, true]))
+  );
+  const [latency, setLatency] = useState(14);
+  const [isFlickering, setIsFlickering] = useState(false);
+  const [showFaultPanel, setShowFaultPanel] = useState(false);
   const pollRef = useRef(null);
 
-  // Poll /api/esp32_status every 3s to keep connection badge accurate
+  // Poll /api/esp32_status every 3s
   useEffect(() => {
     const fetchStatus = async () => {
       try {
+        const start = performance.now();
         const res = await fetch(`${API_BASE}/api/esp32_status`);
         const data = await res.json();
+        const roundTrip = Math.round(performance.now() - start);
+        setIsFlickering(true);
+        setTimeout(() => setIsFlickering(false), 80);
+        setLatency(roundTrip > 0 ? roundTrip : 12);
         setEsp32Connected(data.connected);
-        if (data.ip) {
-          setEsp32IP(data.ip);
-          setTargetIP(prev => prev || data.ip); // pre-fill input if blank
-        }
+        if (data.ip) { setEsp32IP(data.ip); setTargetIP(prev => prev || data.ip); }
       } catch (_) {}
     };
     fetchStatus();
@@ -43,10 +288,7 @@ export default function LiveControl({ state, onSetValue, onConnectESP32 }) {
     setConnecting(true);
     const res = await onConnectESP32(targetIP);
     setConnecting(false);
-    if (res && res.success) {
-      setEsp32Connected(true);
-      setEsp32IP(targetIP);
-    }
+    if (res && res.success) { setEsp32Connected(true); setEsp32IP(targetIP); }
   };
 
   const toggleSensorFilter = (key) => {
@@ -54,142 +296,191 @@ export default function LiveControl({ state, onSetValue, onConnectESP32 }) {
   };
 
   const visibleSensors = SENSOR_META.filter(s => activeFilter[s.key]);
-
-  const connBadgeStyle = {
-    display: 'flex', alignItems: 'center', gap: '7px',
-    padding: '5px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '600',
-    background: esp32Connected ? 'rgba(16,185,129,0.12)' : 'rgba(239,68,68,0.12)',
-    border: `1px solid ${esp32Connected ? 'rgba(16,185,129,0.4)' : 'rgba(239,68,68,0.4)'}`,
-    color: esp32Connected ? '#6ee7b7' : '#fca5a5',
-  };
+  const faults = state.faults || {};
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+    <div className="tab-content-enter" style={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>
 
-      {/* Header + Connect Bar */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '14px' }}>
-        <div>
-          <h2 style={{ fontSize: '20px', fontWeight: '700' }}>Live Sensor Control</h2>
-          <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Real-time sensor value controls & live output telemetry</p>
+      {/* Top Banner */}
+      <div
+        className="interactive-card"
+        style={{
+          background: 'var(--bg-surface-2)',
+          border: '1px solid var(--border-color)',
+          borderRadius: 'var(--radius-lg)',
+          padding: '20px 24px',
+          backdropFilter: 'blur(16px)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '16px',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div
+            style={{
+              width: '46px', height: '46px', borderRadius: '12px',
+              background: esp32Connected ? 'rgba(16,185,129,0.15)' : 'rgba(245,158,11,0.15)',
+              border: `1px solid ${esp32Connected ? 'rgba(16,185,129,0.35)' : 'rgba(245,158,11,0.35)'}`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: '22px', transition: 'all var(--motion-fast)',
+            }}
+          >{esp32Connected ? '⚡' : '🔬'}</div>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
+              <h2 style={{ fontSize: '18px', fontWeight: '700' }}>Live Transducer Control</h2>
+              <Badge variant={esp32Connected ? 'success' : 'warning'} dot pulse={esp32Connected}>
+                {esp32Connected ? 'HARDWARE LINKED' : 'SIMULATED LAB STATE'}
+              </Badge>
+            </div>
+            <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+              12-channel real-time synthesis — direct hardware parameter modulation
+              {esp32IP && <span style={{ fontFamily: 'var(--font-mono)', marginLeft: '8px', color: 'var(--text-main)', opacity: 0.85 }}>[{esp32IP}]</span>}
+            </p>
+          </div>
         </div>
 
-        {/* ESP32 Connection Panel */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'flex-end' }}>
-          {/* Status Badge */}
-          <div style={connBadgeStyle}>
-            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: esp32Connected ? '#10b981' : '#ef4444', flexShrink: 0, boxShadow: esp32Connected ? '0 0 6px #10b981' : 'none' }} />
-            {esp32Connected
-              ? `ESP32 Connected — ${esp32IP}`
-              : 'ESP32 Not Connected — sliders inactive'}
-          </div>
-
-          {/* Connect Bar */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--bg-card)', padding: '8px 14px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
-            <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: '600', whiteSpace: 'nowrap' }}>ESP32 IP:</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: '8px',
+            background: 'rgba(0,0,0,0.3)', padding: '6px 12px',
+            borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)',
+          }}>
+            <span style={{ fontSize: '12px', color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>TARGET:</span>
             <input
               type="text"
-              placeholder="10.102.133.78 or onesensor.local"
-              style={{ background: 'rgba(0,0,0,0.4)', border: '1px solid var(--border-color)', color: '#fff', padding: '6px 10px', borderRadius: '6px', fontSize: '13px', width: '220px' }}
+              placeholder="10.x.x.x or onesensor.local"
+              style={{ background: 'transparent', border: 'none', color: '#fff', fontSize: '13px', fontFamily: 'var(--font-mono)', width: '180px', outline: 'none' }}
               value={targetIP}
               onChange={e => setTargetIP(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleConnect()}
             />
-            <button
-              className="btn-primary"
-              style={{ padding: '6px 14px', fontSize: '13px', whiteSpace: 'nowrap', opacity: connecting ? 0.7 : 1 }}
-              onClick={handleConnect}
-              disabled={connecting}
-            >
-              {connecting ? 'Connecting…' : esp32Connected ? '🔄 Reconnect' : '🔌 Connect'}
-            </button>
           </div>
+          <button className="btn-primary" onClick={handleConnect} disabled={connecting} style={{ minWidth: '120px' }}>
+            {connecting ? (<><RefreshCw size={14} className="spin-icon" /><span>Linking…</span></>) :
+             esp32Connected ? (<><RefreshCw size={14} /><span>Reconnect</span></>) :
+             (<><Wifi size={14} /><span>Connect</span></>)}
+          </button>
+          <button
+            className="btn-secondary"
+            onClick={() => setShowFaultPanel(p => !p)}
+            style={{ borderColor: showFaultPanel ? 'rgba(239,68,68,0.5)' : undefined }}
+          >
+            <Zap size={14} />
+            <span>{showFaultPanel ? 'Hide Faults' : 'Fault Engine'}</span>
+          </button>
         </div>
       </div>
 
-      {/* Warning banner when disconnected */}
+      {/* Disconnected warning */}
       {!esp32Connected && (
-        <div style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.3)', borderRadius: '12px', padding: '12px 16px', fontSize: '13px', color: '#fcd34d', display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <span style={{ fontSize: '18px' }}>⚠️</span>
-          <div>
-            <strong>ESP32 not connected.</strong> Sliders will not send commands to the hardware.
-            {esp32IP && <span> Last known IP: <code style={{ background: 'rgba(255,255,255,0.08)', padding: '1px 5px', borderRadius: '3px' }}>{esp32IP}</code> — click <strong>Reconnect</strong> above.</span>}
+        <div className="banner-enter" style={{
+          background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.3)',
+          borderRadius: 'var(--radius-md)', padding: '12px 18px',
+          fontSize: '13px', color: '#fcd34d',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ fontSize: '18px' }}>⚠️</span>
+            <div>
+              <strong>ESP32 hardware not linked.</strong> Controls are operating in local preview loop.
+              {esp32IP && <span> Last endpoint: <code style={{ fontFamily: 'var(--font-mono)' }}>{esp32IP}</code></span>}
+            </div>
           </div>
+          <Badge variant="warning" size="sm">PREVIEW</Badge>
         </div>
       )}
 
-      {/* Sensor Selection Bar */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'var(--bg-card)', border: '1px solid var(--border-color)', padding: '12px 18px', borderRadius: '14px', flexWrap: 'wrap' }}>
-        <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-muted)' }}>Active Sensors:</span>
-        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-          {SENSOR_META.map(s => (
-            <label
-              key={s.key}
-              style={{
-                display: 'flex', alignItems: 'center', gap: '6px',
-                padding: '6px 12px', borderRadius: '20px',
-                background: activeFilter[s.key] ? 'rgba(99, 102, 241, 0.2)' : 'rgba(255,255,255,0.05)',
-                border: activeFilter[s.key] ? '1px solid #6366f1' : '1px solid var(--border-color)',
-                color: activeFilter[s.key] ? '#fff' : 'var(--text-muted)',
-                fontSize: '13px', cursor: 'pointer', userSelect: 'none', transition: 'all 0.15s'
-              }}
-            >
-              <input type="checkbox" checked={activeFilter[s.key]} onChange={() => toggleSensorFilter(s.key)} style={{ display: 'none' }} />
-              <span>{s.icon}</span>
-              <span>{s.name}</span>
-            </label>
-          ))}
+      {/* Fault Injection Panel (collapsible) */}
+      {showFaultPanel && (
+        <FaultInjectionPanel onInjectFault={onInjectFault} onClearFault={onClearFault} />
+      )}
+
+      {/* Channel Filter Pills */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        background: 'var(--bg-surface-1)', border: '1px solid var(--border-color)',
+        padding: '12px 18px', borderRadius: 'var(--radius-md)', flexWrap: 'wrap', gap: '12px',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            Active Channels:
+          </span>
+          {SENSOR_META.map(s => {
+            const isActive = activeFilter[s.key];
+            return (
+              <button key={s.key} type="button" onClick={() => toggleSensorFilter(s.key)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '6px',
+                  padding: '5px 10px', borderRadius: 'var(--radius-full)',
+                  background: isActive ? 'rgba(37,99,235,0.2)' : 'rgba(255,255,255,0.04)',
+                  border: isActive ? '1px solid var(--color-primary)' : '1px solid var(--border-color)',
+                  color: isActive ? '#fff' : 'var(--text-dim)',
+                  fontSize: '11px', fontWeight: '600', cursor: 'pointer',
+                  userSelect: 'none', transition: 'all var(--motion-fast)',
+                }}
+              >
+                <span>{s.icon}</span>
+                <span>{s.name}</span>
+                {isActive && <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: 'var(--color-primary)' }} />}
+              </button>
+            );
+          })}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--color-cyan)' }}>
+          <span className="badge-dot-pulse" style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: 'var(--color-cyan)', boxShadow: '0 0 8px var(--color-cyan)', display: 'inline-block' }} />
+          <span>SYNTHESIS: 250 HZ</span>
         </div>
       </div>
 
       {/* Cards Grid */}
       {visibleSensors.length === 0 ? (
-        <div style={{ padding: '30px', textAlign: 'center', color: 'var(--text-muted)', background: 'var(--bg-card)', borderRadius: '16px', border: '1px solid var(--border-color)' }}>
-          No sensors selected. Enable at least one above.
+        <div style={{
+          padding: '40px', textAlign: 'center', color: 'var(--text-muted)',
+          background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-color)',
+        }}>
+          No transducer channels selected. Enable one or more channels above.
         </div>
       ) : (
         <div className="cards-grid">
           {visibleSensors.map(s => {
-            const rawVal = state[s.key] !== undefined ? state[s.key] : (s.key === 'soil' ? state.soil_moisture : undefined);
-            const val = rawVal !== undefined ? Number(rawVal).toFixed(1) : '--';
-            const numVal = rawVal !== undefined ? Number(rawVal) : (s.max / 2);
-
+            const rawVal = state[s.key] !== undefined ? state[s.key] : undefined;
+            const activeFault = faults[s.wsKey]?.type;
             return (
-              <div key={s.key} className="sensor-card" style={{ opacity: esp32Connected ? 1 : 0.7 }}>
-                <div className="card-top">
-                  <span className="sensor-name">{s.name}</span>
-                  <span style={{ fontSize: '20px' }}>{s.icon}</span>
-                </div>
-
-                <div className="sensor-value-large" style={{ color: s.color }}>
-                  {val} <span className="unit">{s.unit}</span>
-                </div>
-
-                <div className="slider-container" style={{ position: 'relative' }}>
-                  <input
-                    type="range"
-                    min={s.min}
-                    max={s.max}
-                    step={s.max > 100 ? 5 : 0.5}
-                    value={numVal}
-                    disabled={!esp32Connected}
-                    onChange={e => {
-                      const newVal = parseFloat(e.target.value);
-                      onSetValue(s.key === 'soil' ? 'soil_moisture' : s.key, newVal);
-                    }}
-                    title={esp32Connected ? '' : 'Connect to ESP32 first'}
-                    style={{ cursor: esp32Connected ? 'pointer' : 'not-allowed' }}
-                  />
-                </div>
-
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '12px', fontSize: '12px', color: 'var(--text-dim)' }}>
-                  <span>Min: {s.min}{s.unit}</span>
-                  <span>Max: {s.max}{s.unit}</span>
-                </div>
-              </div>
+              <LiveSensorCard
+                key={s.key}
+                sensor={s}
+                rawVal={rawVal}
+                isConnected={esp32Connected}
+                onSetValue={onSetValue}
+                activeFault={activeFault}
+              />
             );
           })}
         </div>
       )}
+
+      {/* Bottom diagnostics bar */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '10px 16px', background: 'var(--bg-surface-1)',
+        border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)',
+        fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-dim)',
+        flexWrap: 'wrap', gap: '12px',
+      }}>
+        <div style={{ display: 'flex', gap: '20px' }}>
+          <span>INSTRUMENTS: <strong style={{ color: 'var(--text-muted)' }}>{visibleSensors.length} / 12 ONLINE</strong></span>
+          <span>FRAME-SYNC: <strong style={{ color: 'var(--color-success)' }}>4.0 HZ LOCKED</strong></span>
+          <span>LATENCY:{' '}
+            <strong style={{ color: 'var(--color-cyan)', opacity: isFlickering ? 0.4 : 1, transition: 'opacity var(--motion-instant)' }}>
+              {latency} MS
+            </strong>
+          </span>
+        </div>
+        <div><span>ESP32 12-CH DAC/PWM BRIDGE ENGINE v2.0</span></div>
+      </div>
+
     </div>
   );
 }

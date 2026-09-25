@@ -3,6 +3,10 @@
  *
  * Inbound JSON supported:
  *   {"type":"set","sensor":"temperature","value":30.5}
+ *   {"type":"set","sensor":"motion","x":0.1,"y":-0.2,"z":0.98}
+ *   {"type":"motion","x":0.1,"y":-0.2,"z":0.98}
+ *   {"type":"fault","sensor":"proximity","fault":"noise","magnitude":15,"durationMs":0,"latencyMs":0}
+ *   {"type":"fault_clear","sensor":"proximity"} // or sensor:"all"
  *   {"type":"start_ramp","sensor":"temperature","from":0.0,"to":50.0,"duration":10}
  *   {"type":"start_static","sensor":"temperature","value":25.0}
  *   {"type":"stop_scenario","sensor":"temperature"}
@@ -10,11 +14,6 @@
  *   {"type":"get_config"}
  *   {"type":"set_config","channels":[...]}
  *   {"type":"reset_config"}
- *
- * Outbound JSON:
- *   {"type":"state","temperature":30.5,"humidity":50.0,"gas":500.0,"light":500.0,"soil":50.0}
- *   {"type":"config_state","channels":[...]}
- *   {"type":"config_error","reason":"..."}
  */
 #pragma once
 #include <Arduino.h>
@@ -24,6 +23,7 @@
 #include "channel_manager.h"
 #include "config_store.h"
 #include "scenario_engine.h"
+#include "fault_engine.h"
 
 class WebSocketHandler {
 public:
@@ -39,6 +39,13 @@ public:
             typeOut = SensorType::SOIL_MOISTURE;
             return true;
         }
+        else if (strcmp(name, "motionX")       == 0) { typeOut = SensorType::MOTION_X;      return true; }
+        else if (strcmp(name, "motionY")       == 0) { typeOut = SensorType::MOTION_Y;      return true; }
+        else if (strcmp(name, "motionZ")       == 0) { typeOut = SensorType::MOTION_Z;      return true; }
+        else if (strcmp(name, "proximity")     == 0) { typeOut = SensorType::PROXIMITY;     return true; }
+        else if (strcmp(name, "sound")         == 0) { typeOut = SensorType::SOUND;         return true; }
+        else if (strcmp(name, "uv")            == 0) { typeOut = SensorType::UV;            return true; }
+        else if (strcmp(name, "co2")           == 0) { typeOut = SensorType::CO2;           return true; }
         return false;
     }
 
@@ -49,6 +56,13 @@ public:
             case SensorType::GAS:           return "gas";
             case SensorType::LIGHT:         return "light";
             case SensorType::SOIL_MOISTURE: return "soil_moisture";
+            case SensorType::MOTION_X:      return "motionX";
+            case SensorType::MOTION_Y:      return "motionY";
+            case SensorType::MOTION_Z:      return "motionZ";
+            case SensorType::PROXIMITY:     return "proximity";
+            case SensorType::SOUND:         return "sound";
+            case SensorType::UV:            return "uv";
+            case SensorType::CO2:           return "co2";
             default:                        return "unknown";
         }
     }
@@ -68,9 +82,36 @@ public:
         }
     }
 
+    // ── Helper: Map FaultType enum to/from string ─────────────────────────────
+    static bool parseFaultType(const char* name, FaultType& typeOut) {
+        if      (strcasecmp(name, "none") == 0)       { typeOut = FaultType::NONE;       return true; }
+        else if (strcasecmp(name, "dropout") == 0)    { typeOut = FaultType::DROPOUT;    return true; }
+        else if (strcasecmp(name, "stuck") == 0)      { typeOut = FaultType::STUCK;      return true; }
+        else if (strcasecmp(name, "noise") == 0)      { typeOut = FaultType::NOISE;      return true; }
+        else if (strcasecmp(name, "spike") == 0)      { typeOut = FaultType::SPIKE;      return true; }
+        else if (strcasecmp(name, "drift") == 0)      { typeOut = FaultType::DRIFT;      return true; }
+        else if (strcasecmp(name, "disconnect") == 0) { typeOut = FaultType::DISCONNECT; return true; }
+        else if (strcasecmp(name, "latency") == 0)    { typeOut = FaultType::LATENCY;    return true; }
+        return false;
+    }
+
+    static const char* faultTypeToString(FaultType type) {
+        switch (type) {
+            case FaultType::NONE:       return "none";
+            case FaultType::DROPOUT:    return "dropout";
+            case FaultType::STUCK:      return "stuck";
+            case FaultType::NOISE:      return "noise";
+            case FaultType::SPIKE:      return "spike";
+            case FaultType::DRIFT:      return "drift";
+            case FaultType::DISCONNECT: return "disconnect";
+            case FaultType::LATENCY:    return "latency";
+            default:                    return "none";
+        }
+    }
+
     // ── Inbound Message Handling ──────────────────────────────────────────────
     void onMessage(AsyncWebSocketClient* client, const char* data, size_t len) {
-        DynamicJsonDocument doc(2048);
+        DynamicJsonDocument doc(4096);
         DeserializationError err = deserializeJson(doc, data, len);
         if (err) {
             Serial.printf("[WS] JSON parse error: %s\n", err.c_str());
@@ -81,7 +122,18 @@ public:
         const char* type = doc["type"] | "";
         const char* sensorName = doc["sensor"] | "";
 
-        // 1. Manual SET command (supports "set" or "set_value")
+        // 1. Compound Motion message
+        if (strcmp(type, "motion") == 0 || (strcmp(type, "set") == 0 && strcmp(sensorName, "motion") == 0)) {
+            float x = doc["x"] | 0.0f;
+            float y = doc["y"] | 0.0f;
+            float z = doc["z"] | 1.0f;
+            gSensorState.setMotion(x, y, z);
+            gChannelManager.updateAll();
+            broadcastState();
+            return;
+        }
+
+        // 2. Manual SET command
         if (strcmp(type, "set") == 0 || strcmp(type, "set_value") == 0) {
             SensorType sType;
             if (!parseSensorType(sensorName, sType)) {
@@ -103,7 +155,64 @@ public:
             return;
         }
 
-        // 2. Start RAMP Scenario command
+        // 3. FAULT Injection command
+        if (strcmp(type, "fault") == 0) {
+            SensorType sType;
+            if (!parseSensorType(sensorName, sType)) {
+                _sendError(client, "unknown sensor for fault");
+                return;
+            }
+
+            const char* faultStr = doc["fault"] | "none";
+            FaultType fType;
+            if (!parseFaultType(faultStr, fType)) {
+                _sendError(client, "unknown fault type");
+                return;
+            }
+
+            ChannelFaultState f;
+            f.type = fType;
+            f.magnitude = doc["magnitude"] | 0.0f;
+            f.latencyMs = doc["latencyMs"] | doc["latency"] | 0;
+            f.durationMs = doc["durationMs"] | doc["duration"] | 0;
+            f.startedAtMs = millis();
+
+            // Find channel index
+            const auto& cfg = gChannelManager.getConfig();
+            for (uint8_t i = 0; i < MAX_CHANNELS; i++) {
+                if (cfg[i].sensor == sType) {
+                    gSensorState.setFault(i, f);
+                    break;
+                }
+            }
+
+            gChannelManager.updateAll();
+            broadcastState();
+            return;
+        }
+
+        // 4. FAULT_CLEAR command
+        if (strcmp(type, "fault_clear") == 0) {
+            if (strcmp(sensorName, "all") == 0 || strlen(sensorName) == 0) {
+                gSensorState.clearAllFaults();
+            } else {
+                SensorType sType;
+                if (parseSensorType(sensorName, sType)) {
+                    const auto& cfg = gChannelManager.getConfig();
+                    for (uint8_t i = 0; i < MAX_CHANNELS; i++) {
+                        if (cfg[i].sensor == sType) {
+                            gSensorState.clearFault(i);
+                            break;
+                        }
+                    }
+                }
+            }
+            gChannelManager.updateAll();
+            broadcastState();
+            return;
+        }
+
+        // 5. Start RAMP Scenario command
         if (strcmp(type, "start_ramp") == 0) {
             SensorType sType;
             if (!parseSensorType(sensorName, sType)) {
@@ -121,7 +230,7 @@ public:
             return;
         }
 
-        // 3. Start STATIC Scenario command
+        // 6. Start STATIC Scenario command
         if (strcmp(type, "start_static") == 0) {
             SensorType sType;
             if (!parseSensorType(sensorName, sType)) {
@@ -135,7 +244,7 @@ public:
             return;
         }
 
-        // 4. Stop Scenario command
+        // 7. Stop Scenario command
         if (strcmp(type, "stop_scenario") == 0) {
             SensorType sType;
             if (!parseSensorType(sensorName, sType)) {
@@ -147,24 +256,24 @@ public:
             return;
         }
 
-        // 5. Stop ALL Scenarios
+        // 8. Stop ALL Scenarios
         if (strcmp(type, "stop_all_scenarios") == 0) {
             gScenarioEngine.stopAll();
             broadcastState();
             return;
         }
 
-        // 6. Config Protocol: GET_CONFIG
+        // 9. Config Protocol: GET_CONFIG
         if (strcmp(type, "get_config") == 0) {
             sendConfigState(client);
             return;
         }
 
-        // 7. Config Protocol: SET_CONFIG
+        // 10. Config Protocol: SET_CONFIG
         if (strcmp(type, "set_config") == 0) {
             JsonArray channelsArr = doc["channels"].as<JsonArray>();
             if (channelsArr.isNull() || channelsArr.size() != MAX_CHANNELS) {
-                _sendConfigError(client, "channels array must contain exactly 5 channel configurations");
+                _sendConfigError(client, "channels array must contain exactly 12 channel configurations");
                 return;
             }
 
@@ -213,7 +322,7 @@ public:
             return;
         }
 
-        // 8. Config Protocol: RESET_CONFIG
+        // 11. Config Protocol: RESET_CONFIG
         if (strcmp(type, "reset_config") == 0) {
             gConfigStore.resetToDefaults();
             std::array<ChannelConfig, MAX_CHANNELS> defaultCfg;
@@ -229,31 +338,49 @@ public:
         _sendError(client, "unknown type");
     }
 
-    // ── Outbound: Broadcast Sensor State to ALL connected clients ─────────────
+    // ── Outbound: Broadcast Sensor State & Faults to ALL connected clients ─────
     void broadcastState() {
         if (_ws->count() == 0) return;
 
         SensorValues v = gSensorState.get();
 
-        DynamicJsonDocument doc(384);
-        doc["type"]        = "state";
-        doc["temperature"] = round(v.temperature  * 100.0f) / 100.0f;
-        doc["humidity"]    = round(v.humidity      * 100.0f) / 100.0f;
-        doc["gas"]         = round(v.gas           * 10.0f)  / 10.0f;
-        doc["light"]       = round(v.light         * 10.0f)  / 10.0f;
-        doc["soil"]        = round(v.soilMoisture  * 100.0f) / 100.0f;
-        doc["soil_moisture"] = round(v.soilMoisture  * 100.0f) / 100.0f;
+        DynamicJsonDocument doc(2048);
+        doc["type"]          = "state";
+        doc["temperature"]   = round(v.temperature  * 100.0f) / 100.0f;
+        doc["humidity"]      = round(v.humidity     * 100.0f) / 100.0f;
+        doc["gas"]           = round(v.gas          * 10.0f)  / 10.0f;
+        doc["light"]         = round(v.light        * 10.0f)  / 10.0f;
+        doc["soil"]          = round(v.soilMoisture * 100.0f) / 100.0f;
+        doc["soil_moisture"] = round(v.soilMoisture * 100.0f) / 100.0f;
+        doc["motionX"]       = round(v.motionX      * 1000.0f) / 1000.0f;
+        doc["motionY"]       = round(v.motionY      * 1000.0f) / 1000.0f;
+        doc["motionZ"]       = round(v.motionZ      * 1000.0f) / 1000.0f;
+        doc["proximity"]     = round(v.proximity    * 10.0f)  / 10.0f;
+        doc["sound"]         = round(v.sound        * 10.0f)  / 10.0f;
+        doc["uv"]            = round(v.uv           * 100.0f) / 100.0f;
+        doc["co2"]           = round(v.co2          * 10.0f)  / 10.0f;
 
-        char buf[384];
-        size_t n = serializeJson(doc, buf, sizeof(buf));
-        _ws->textAll(buf, n);
+        JsonObject faultsObj = doc.createNestedObject("faults");
+        const auto& cfg = gChannelManager.getConfig();
+        for (uint8_t i = 0; i < MAX_CHANNELS; i++) {
+            ChannelFaultState f = gSensorState.getFault(i);
+            const char* sKey = sensorTypeToString(cfg[i].sensor);
+            JsonObject fItem = faultsObj.createNestedObject(sKey);
+            fItem["type"]      = faultTypeToString(f.type);
+            fItem["magnitude"] = f.magnitude;
+            fItem["latencyMs"] = f.latencyMs;
+        }
+
+        String jsonStr;
+        serializeJson(doc, jsonStr);
+        _ws->textAll(jsonStr);
     }
 
     // ── Outbound: Broadcast Config State to ALL connected clients ─────────────
     void broadcastConfigState() {
         if (_ws->count() == 0) return;
 
-        DynamicJsonDocument doc(2048);
+        DynamicJsonDocument doc(4096);
         doc["type"] = "config_state";
         JsonArray channelsArr = doc.createNestedArray("channels");
 
@@ -280,7 +407,7 @@ public:
 
     // ── Outbound: Send Config State to specific client ────────────────────────
     void sendConfigState(AsyncWebSocketClient* client) {
-        DynamicJsonDocument doc(2048);
+        DynamicJsonDocument doc(4096);
         doc["type"] = "config_state";
         JsonArray channelsArr = doc.createNestedArray("channels");
 

@@ -1,11 +1,12 @@
 /**
- * channel_manager.cpp — LEDC channel init, validation, update loop, and NVS config sync
+ * channel_manager.cpp — LEDC channel init, validation, update loop, fault injection, and NVS config sync
  */
 
 #include "channel_manager.h"
 #include "hardware_config.h"
 #include "sensor_state.h"
 #include "value_mapper.h"
+#include "fault_engine.h"
 #include <Arduino.h>
 
 // ─── Global singleton ─────────────────────────────────────────────────────────
@@ -55,14 +56,30 @@ bool ChannelManager::begin() {
     return true;
 }
 
-// ─── updateAll() ─────────────────────────────────────────────────────────────
+// ─── updateAll() with Fault Injection ─────────────────────────────────────────
 void ChannelManager::updateAll() {
     if (!_initialized) return;
+    uint32_t nowMs = millis();
 
     for (uint8_t i = 0; i < MAX_CHANNELS; i++) {
         const ChannelConfig& ch = _channels[i];
-        float logicalValue = gSensorState.getByType(ch.sensor);
-        float dutyPct      = valueToDutyPercent(logicalValue, ch.inputMin, ch.inputMax);
+        float rawValue = gSensorState.getByType(ch.sensor);
+
+        // Apply fault transformation before DAC/PWM hardware write
+        ChannelFaultState fault = gSensorState.getFault(i);
+        float logicalValue = applyFault(rawValue, fault, ch.inputMin, ch.inputMax, nowMs, i);
+
+        if (isnan(logicalValue)) {
+            // Disconnect fault: mute output
+            if (ch.signal == SignalType::DAC) {
+                dacWrite(ch.gpio, 0);
+            } else {
+                ledcWrite(ch.ledcChannel, 0);
+            }
+            continue;
+        }
+
+        float dutyPct = valueToDutyPercent(logicalValue, ch.inputMin, ch.inputMax);
 
         if (ch.signal == SignalType::DAC) {
             uint8_t dacVal = (uint8_t)((constrain(dutyPct, 0.0f, 100.0f) / 100.0f) * 255.0f + 0.5f);
@@ -181,19 +198,7 @@ bool ChannelManager::_validateConfig(const std::array<ChannelConfig, MAX_CHANNEL
     for (uint8_t i = 0; i < MAX_CHANNELS; i++) {
         for (uint8_t j = i + 1; j < MAX_CHANNELS; j++) {
             if (cfg[i].gpio == cfg[j].gpio) {
-                outErrorReason = "GPIO " + String(cfg[i].gpio) + " is assigned to multiple channels";
-                return false;
-            }
-        }
-    }
-
-    // 3. Check for duplicate LEDC channel indices (for PWM channels)
-    for (uint8_t i = 0; i < MAX_CHANNELS; i++) {
-        if (cfg[i].signal != SignalType::PWM) continue;
-        for (uint8_t j = i + 1; j < MAX_CHANNELS; j++) {
-            if (cfg[j].signal != SignalType::PWM) continue;
-            if (cfg[i].ledcChannel == cfg[j].ledcChannel) {
-                outErrorReason = "LEDC channel " + String(cfg[i].ledcChannel) + " is assigned to multiple PWM channels";
+                outErrorReason = "Duplicate GPIO " + String(cfg[i].gpio) + " assigned to multiple channels";
                 return false;
             }
         }
@@ -204,7 +209,7 @@ bool ChannelManager::_validateConfig(const std::array<ChannelConfig, MAX_CHANNEL
 
 // ─── _dutyPercentToCount() ───────────────────────────────────────────────────
 uint32_t ChannelManager::_dutyPercentToCount(float dutyPercent, uint8_t resolutionBits) {
-    uint32_t maxCount = (1u << resolutionBits) - 1;
-    float clamped = constrain(dutyPercent, 0.0f, 100.0f);
-    return (uint32_t)((clamped / 100.0f) * (float)maxCount + 0.5f);
+    float clampedPct = constrain(dutyPercent, 0.0f, 100.0f);
+    uint32_t maxCount = (1UL << resolutionBits) - 1;
+    return (uint32_t)((clampedPct / 100.0f) * (float)maxCount + 0.5f);
 }
