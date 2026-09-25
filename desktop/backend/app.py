@@ -209,7 +209,7 @@ async def build_flash_esp32(req: BuildFlashESP32Request):
             cwd=ESP32_DIR,
             capture_output=True,
             text=True,
-            timeout=120
+            timeout=600
         )
         if build_result.returncode != 0:
             return {
@@ -220,7 +220,7 @@ async def build_flash_esp32(req: BuildFlashESP32Request):
     except FileNotFoundError:
         return {"success": False, "stage": "build", "reason": "PlatformIO (pio) not found. Please install it first."}
     except subprocess.TimeoutExpired:
-        return {"success": False, "stage": "build", "reason": "Build timed out after 120 seconds."}
+        return {"success": False, "stage": "build", "reason": "Build timed out after 600 seconds."}
     except Exception as e:
         return {"success": False, "stage": "build", "reason": str(e)}
 
