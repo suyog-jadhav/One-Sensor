@@ -28,19 +28,33 @@ const ALL_ESP32_PINS = [
 ];
 
 const SENSOR_OPTIONS = [
-  { id: 'temperature', name: 'Temperature' },
-  { id: 'humidity', name: 'Humidity' },
-  { id: 'gas', name: 'Gas Concentration' },
-  { id: 'light', name: 'Light Intensity' },
-  { id: 'soil_moisture', name: 'Soil Moisture' }
+  { id: 'temperature',   name: 'Temperature' },
+  { id: 'humidity',      name: 'Humidity' },
+  { id: 'gas',           name: 'Gas Concentration' },
+  { id: 'light',         name: 'Light Intensity' },
+  { id: 'soil_moisture', name: 'Soil Moisture' },
+  { id: 'motionX',       name: 'Motion X (accel)' },
+  { id: 'motionY',       name: 'Motion Y (accel)' },
+  { id: 'motionZ',       name: 'Motion Z (accel)' },
+  { id: 'proximity',     name: 'Proximity' },
+  { id: 'sound',         name: 'Sound Level' },
+  { id: 'uv',            name: 'UV Index' },
+  { id: 'co2',           name: 'CO₂ / Air Quality' },
 ];
 
 const DEFAULT_CHANNELS = [
-  { sensor: 'temperature', signal: 'dac', gpio: 25, ledcChannel: 0, frequencyHz: 500, resolutionBits: 10, inputMin: 0, inputMax: 50, defaultValue: 25, enabled: true, calOffset: 0, calScale: 1.0 },
-  { sensor: 'humidity', signal: 'dac', gpio: 26, ledcChannel: 1, frequencyHz: 500, resolutionBits: 10, inputMin: 0, inputMax: 100, defaultValue: 50, enabled: true, calOffset: 0, calScale: 1.0 },
-  { sensor: 'gas', signal: 'pwm', gpio: 18, ledcChannel: 2, frequencyHz: 500, resolutionBits: 10, inputMin: 0, inputMax: 1000, defaultValue: 300, enabled: true, calOffset: 0, calScale: 1.0 },
-  { sensor: 'light', signal: 'pwm', gpio: 19, ledcChannel: 3, frequencyHz: 500, resolutionBits: 10, inputMin: 0, inputMax: 1000, defaultValue: 500, enabled: true, calOffset: 0, calScale: 1.0 },
-  { sensor: 'soil_moisture', signal: 'pwm', gpio: 21, ledcChannel: 4, frequencyHz: 500, resolutionBits: 10, inputMin: 0, inputMax: 100, defaultValue: 50, enabled: true, calOffset: 0, calScale: 1.0 }
+  { sensor: 'temperature',   signal: 'dac', gpio: 25, ledcChannel: 0,  frequencyHz: 500, resolutionBits: 10, inputMin: 0,    inputMax: 50,   defaultValue: 25,  enabled: true, calOffset: 0, calScale: 1.0 },
+  { sensor: 'humidity',      signal: 'dac', gpio: 26, ledcChannel: 1,  frequencyHz: 500, resolutionBits: 10, inputMin: 0,    inputMax: 100,  defaultValue: 50,  enabled: true, calOffset: 0, calScale: 1.0 },
+  { sensor: 'gas',           signal: 'pwm', gpio: 18, ledcChannel: 2,  frequencyHz: 500, resolutionBits: 10, inputMin: 0,    inputMax: 1000, defaultValue: 300, enabled: true, calOffset: 0, calScale: 1.0 },
+  { sensor: 'light',         signal: 'pwm', gpio: 19, ledcChannel: 3,  frequencyHz: 500, resolutionBits: 10, inputMin: 0,    inputMax: 1000, defaultValue: 500, enabled: true, calOffset: 0, calScale: 1.0 },
+  { sensor: 'soil_moisture', signal: 'pwm', gpio: 21, ledcChannel: 4,  frequencyHz: 500, resolutionBits: 10, inputMin: 0,    inputMax: 100,  defaultValue: 50,  enabled: true, calOffset: 0, calScale: 1.0 },
+  { sensor: 'motionX',       signal: 'pwm', gpio: 22, ledcChannel: 5,  frequencyHz: 500, resolutionBits: 10, inputMin: -2,   inputMax: 2,    defaultValue: 0,   enabled: true, calOffset: 0, calScale: 1.0 },
+  { sensor: 'motionY',       signal: 'pwm', gpio: 23, ledcChannel: 6,  frequencyHz: 500, resolutionBits: 10, inputMin: -2,   inputMax: 2,    defaultValue: 0,   enabled: true, calOffset: 0, calScale: 1.0 },
+  { sensor: 'motionZ',       signal: 'pwm', gpio: 27, ledcChannel: 7,  frequencyHz: 500, resolutionBits: 10, inputMin: -2,   inputMax: 2,    defaultValue: 1,   enabled: true, calOffset: 0, calScale: 1.0 },
+  { sensor: 'proximity',     signal: 'pwm', gpio: 32, ledcChannel: 8,  frequencyHz: 500, resolutionBits: 10, inputMin: 2,    inputMax: 400,  defaultValue: 50,  enabled: true, calOffset: 0, calScale: 1.0 },
+  { sensor: 'sound',         signal: 'pwm', gpio: 33, ledcChannel: 9,  frequencyHz: 500, resolutionBits: 10, inputMin: 30,   inputMax: 120,  defaultValue: 40,  enabled: true, calOffset: 0, calScale: 1.0 },
+  { sensor: 'uv',            signal: 'pwm', gpio: 14, ledcChannel: 10, frequencyHz: 500, resolutionBits: 10, inputMin: 0,    inputMax: 11,   defaultValue: 2,   enabled: true, calOffset: 0, calScale: 1.0 },
+  { sensor: 'co2',           signal: 'pwm', gpio: 12, ledcChannel: 11, frequencyHz: 500, resolutionBits: 10, inputMin: 400,  inputMax: 5000, defaultValue: 420, enabled: true, calOffset: 0, calScale: 1.0 },
 ];
 
 export default function ConfigEditor({ configState, configError, onApplyConfig, onResetConfig }) {
@@ -238,10 +252,10 @@ export default function ConfigEditor({ configState, configError, onApplyConfig, 
             <span style={{ fontSize: '14px', fontWeight: '700' }}>Transducer Channel Matrix</span>
           </div>
           <Badge
-            variant={activeCount === 5 ? 'success' : 'neutral'}
+            variant={activeCount === 12 ? 'success' : 'warning'}
             style={{ transition: 'all var(--motion-fast)' }}
           >
-            {activeCount} / 5 CHANNELS ACTIVE
+            {activeCount} / 12 CHANNELS ACTIVE
           </Badge>
         </div>
 
@@ -619,7 +633,19 @@ export default function ConfigEditor({ configState, configError, onApplyConfig, 
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: '4px' }}>
               <span>Gas / Light / Soil → Arduino</span>
-              <strong style={{ color: 'var(--color-primary)' }}>PINS D4, D5, D6</strong>
+              <strong style={{ color: 'var(--color-primary)' }}>PINS D2, D3, D4</strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: '4px' }}>
+              <span>Motion X/Y/Z → Arduino</span>
+              <strong style={{ color: '#f472b6' }}>PINS D5, D6, D7</strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: '4px' }}>
+              <span>Proximity / Sound → Arduino</span>
+              <strong style={{ color: '#fb923c' }}>PINS D8, D9</strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: '4px' }}>
+              <span>UV / CO₂ → Arduino</span>
+              <strong style={{ color: '#fbbf24' }}>PINS D10, D11</strong>
             </div>
           </div>
 

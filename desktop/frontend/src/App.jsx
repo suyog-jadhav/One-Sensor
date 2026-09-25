@@ -6,18 +6,20 @@ import ScenarioBuilder from './components/ScenarioBuilder';
 import FlashPanel from './components/FlashPanel';
 import SetupWizard from './components/SetupWizard';
 import ConsoleLog from './components/ConsoleLog';
-import { Activity, Sliders, TrendingUp, Zap, HelpCircle, Terminal, Cpu, Radio } from 'lucide-react';
+import FaultInjection from './components/FaultInjection';
+import { Activity, Sliders, TrendingUp, Zap, HelpCircle, Terminal, Radio, ShieldOff } from 'lucide-react';
 
 const API_BASE = 'http://127.0.0.1:8000';
 const WS_URL = 'ws://127.0.0.1:8000/ws';
 
 const TABS = [
-  { id: 'live', label: 'Live Control', sub: 'Transducers', icon: Activity },
-  { id: 'config', label: 'Config Editor', sub: 'Pin Matrix', icon: Sliders },
-  { id: 'scenario', label: 'Scenario Builder', sub: 'Waveforms', icon: TrendingUp },
-  { id: 'flash', label: 'Flash Panel', sub: 'Bootloader', icon: Zap },
-  { id: 'wizard', label: 'Setup Wizard', sub: 'Provisioning', icon: HelpCircle },
-  { id: 'logs', label: 'Console & Serial', sub: 'Telemetry', icon: Terminal },
+  { id: 'live',         label: 'Live Control',    sub: 'Transducers', icon: Activity },
+  { id: 'config',       label: 'Config Editor',   sub: 'Pin Matrix',  icon: Sliders },
+  { id: 'scenario',     label: 'Scenario Builder',sub: 'Waveforms',   icon: TrendingUp },
+  { id: 'fault_inject', label: 'Fault Injection', sub: 'Chaos Engine',icon: ShieldOff },
+  { id: 'flash',        label: 'Flash Panel',     sub: 'Bootloader',  icon: Zap },
+  { id: 'wizard',       label: 'Setup Wizard',    sub: 'Provisioning',icon: HelpCircle },
+  { id: 'logs',         label: 'Console & Serial',sub: 'Telemetry',   icon: Terminal },
 ];
 
 export default function App() {
@@ -388,6 +390,12 @@ export default function App() {
             onStartStatic={handleStartStatic}
             onStopScenario={handleStopScenario}
             onStopAll={handleStopAllScenarios}
+            onInjectFault={handleInjectFault}
+            onClearFault={handleClearFault}
+          />
+        )}
+        {activeTab === 'fault_inject' && (
+          <FaultInjection
             onInjectFault={handleInjectFault}
             onClearFault={handleClearFault}
           />
