@@ -1,7 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import Badge from './Badge';
 import { useSmoothedValue } from '../utils/useSmoothedValue';
 import { RefreshCw, Wifi, AlertTriangle, Zap, RotateCcw } from 'lucide-react';
+
+const MotionGizmo3D = lazy(() => import('./MotionGizmo3D'));
 
 const SENSOR_META = [
   { key: 'temperature',  name: 'Temperature',     unit: '°C',    icon: '🌡️',  min: 0,   max: 50,   step: 0.5,  color: '#ef4444', wsKey: 'temperature' },
@@ -433,6 +435,22 @@ export default function LiveControl({ state, onSetValue, onSetMotion, onInjectFa
           <span>SYNTHESIS: 250 HZ</span>
         </div>
       </div>
+
+      {/* 3D Motion Gizmo (shown when any motion axis is active) */}
+      {(activeFilter.motionX || activeFilter.motionY || activeFilter.motionZ) && (
+        <Suspense fallback={
+          <div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-dim)', background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-color)' }}>
+            Loading 3D Gyroscope…
+          </div>
+        }>
+          <MotionGizmo3D
+            accelX={state.motionX ?? 0}
+            accelY={state.motionY ?? 0}
+            accelZ={state.motionZ ?? 1}
+            onSetMotion={onSetMotion}
+          />
+        </Suspense>
+      )}
 
       {/* Cards Grid */}
       {visibleSensors.length === 0 ? (
