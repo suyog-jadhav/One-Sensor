@@ -69,7 +69,12 @@ async def websocket_endpoint(websocket: WebSocket):
                 data = json.loads(text)
                 msg_type = data.get("type", "")
                 
-                if msg_type in ["set", "set_value", "start_ramp", "start_static", "stop_scenario", "stop_all_scenarios", "get_config", "set_config", "reset_config"]:
+                if msg_type in [
+                    "set", "set_value", "motion",
+                    "fault", "fault_clear",
+                    "start_ramp", "start_static", "stop_scenario", "stop_all_scenarios",
+                    "get_config", "set_config", "reset_config"
+                ]:
                     await device_client.send(data)
             except json.JSONDecodeError:
                 pass

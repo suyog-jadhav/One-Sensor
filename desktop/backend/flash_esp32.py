@@ -13,17 +13,31 @@ def flash_esp32_firmware(port: str, firmware_bin_path: str, baud: int = 460800, 
     if not os.path.exists(firmware_bin_path):
         return {"success": False, "reason": f"Firmware file not found: {firmware_bin_path}"}
 
+    bin_dir = os.path.dirname(os.path.abspath(firmware_bin_path))
+    bootloader_bin = os.path.join(bin_dir, "bootloader.bin")
+    partitions_bin = os.path.join(bin_dir, "partitions.bin")
+
     command_args = [
         sys.executable, '-m', 'esptool',
         '--chip', 'esp32',
         '--port', port,
         '--baud', str(baud),
-        '--before', 'default_reset',
-        '--after', 'hard_reset',
-        'write_flash',
+        '--before', 'default-reset',
+        '--after', 'hard-reset',
+        'write-flash',
         '-z',
-        '0x0', firmware_bin_path
     ]
+
+    if os.path.exists(bootloader_bin) and os.path.exists(partitions_bin):
+        command_args += [
+            '0x1000', bootloader_bin,
+            '0x8000', partitions_bin,
+            '0x10000', firmware_bin_path,
+        ]
+    else:
+        command_args += [
+            '0x0', firmware_bin_path
+        ]
 
     try:
         result = subprocess.run(command_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=True)
@@ -42,7 +56,7 @@ def get_esp32_chip_id(port: str, baud: int = 115200):
             sys.executable, '-m', 'esptool',
             '--port', port,
             '--baud', str(baud),
-            'chip_id'
+            'chip-id'
         ]
         result = subprocess.run(command_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=True)
         return {"success": True, "chip_id": result.stdout.strip()}

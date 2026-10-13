@@ -47,14 +47,14 @@ class DeviceWSClient:
     async def connect(self, esp32_ip: str):
         """Connect to ESP32 WebSocket with unlimited auto-reconnect & exponential backoff."""
         self.esp32_ip = esp32_ip
-        self.running = True
         ws_url = f"ws://{esp32_ip}/ws"
 
         INITIAL_DELAY = 2      # seconds before first retry
         MAX_DELAY     = 30     # maximum backoff cap
         delay         = INITIAL_DELAY
+        current_task  = asyncio.current_task()
 
-        while self.running:
+        while self.running and (self.task is None or self.task is current_task):
             try:
                 print(f"[DeviceWSClient] Connecting to {ws_url} ...")
                 async with websockets.connect(
@@ -63,6 +63,9 @@ class DeviceWSClient:
                     ping_interval=20,
                     ping_timeout=10,
                 ) as websocket:
+                    if self.task is not None and self.task is not current_task:
+                        return
+
                     self.ws = websocket
                     self._connected = True
                     delay = INITIAL_DELAY   # reset backoff on successful connect
@@ -80,6 +83,8 @@ class DeviceWSClient:
                         })
 
                     async for message in websocket:
+                        if self.task is not None and self.task is not current_task:
+                            return
                         try:
                             data = json.loads(message)
                             if self.broadcast_callback:
@@ -88,28 +93,29 @@ class DeviceWSClient:
                             pass
 
             except asyncio.CancelledError:
-                # Intentional shutdown
                 break
             except Exception as e:
                 print(f"[DeviceWSClient] ❌ Connection lost: {e}. Retrying in {delay}s...")
             finally:
-                self.ws = None
-                self._connected = False
+                if self.task is None or self.task is current_task:
+                    self.ws = None
+                    self._connected = False
 
-            if self.running:
-                # Notify frontend that ESP32 disconnected
-                if self.broadcast_callback:
-                    try:
-                        await self.broadcast_callback({
-                            "type": "esp32_status",
-                            "connected": False,
-                            "ip": esp32_ip
-                        })
-                    except Exception:
-                        pass
+            if not self.running or (self.task is not None and self.task is not current_task):
+                break
 
-                await asyncio.sleep(delay)
-                delay = min(delay * 2, MAX_DELAY)
+            if self.broadcast_callback:
+                try:
+                    await self.broadcast_callback({
+                        "type": "esp32_status",
+                        "connected": False,
+                        "ip": esp32_ip
+                    })
+                except Exception:
+                    pass
+
+            await asyncio.sleep(delay)
+            delay = min(delay * 2, MAX_DELAY)
 
     async def send(self, data: dict) -> bool:
         if self.ws and self._connected:
@@ -125,10 +131,15 @@ class DeviceWSClient:
     def start_connection(self, esp32_ip: str):
         """Start (or restart) the connection loop for the given IP. Persists IP across restarts."""
         _save_last_ip(esp32_ip)
+
+        # If already connected to this IP, no need to tear down
+        if self.is_connected and self.esp32_ip == esp32_ip:
+            print(f"[DeviceWSClient] Already connected to {esp32_ip}")
+            return
+
         self.esp32_ip = esp32_ip
 
         if self.task and not self.task.done():
-            self.running = False
             self.task.cancel()
 
         self.running = True

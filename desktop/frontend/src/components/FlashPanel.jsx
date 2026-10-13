@@ -19,7 +19,7 @@ const ARDUINO_STAGES = [
   { label: 'Success! Arduino firmware written.', pct: 100 },
 ];
 
-export default function FlashPanel({ ports, onFlashESP32, onFlashArduino, toolchainStatus }) {
+export default function FlashPanel({ ports, onFlashESP32, onFlashArduino, toolchainStatus, onRefreshPorts }) {
   const [selectedPortESP, setSelectedPortESP] = useState('');
   const [selectedPortUno, setSelectedPortUno] = useState('');
 
@@ -56,6 +56,7 @@ export default function FlashPanel({ ports, onFlashESP32, onFlashArduino, toolch
 
   const handleRefreshClick = () => {
     setIsRefreshingPorts(true);
+    if (onRefreshPorts) onRefreshPorts();
     setTimeout(() => setIsRefreshingPorts(false), 500);
   };
 

@@ -3,25 +3,8 @@
 /**
  * OneSensor.h — Public facade for the OneSensor Arduino library
  *
- * The application sketch only needs this header. It never sees PwmDecoder,
- * pulseIn(), GPIO numbers, or WebSocket internals.
- *
- * Required sketch pattern (must compile and work as-is):
- *
- *   #include <OneSensor.h>
- *   OneSensor sensor;
- *   void setup() { Serial.begin(115200); sensor.begin(); }
- *   void loop()  {
- *       sensor.update();
- *       Serial.println(sensor.readTemperature());
- *       Serial.println(sensor.readHumidity());
- *       Serial.println(sensor.readGas());
- *       Serial.println(sensor.readLight());
- *       Serial.println(sensor.readSoilMoisture());
- *   }
- *
- * This API shape must not change even if the transport changes (PWM → DAC/UART).
- * Only OneSensor internals and the decoder layer change for new transports.
+ * Supports all 12 simulated sensors with dynamic runtime configuration,
+ * EEPROM persistence, and real-time PWM/DAC decoding.
  */
 
 #include <Arduino.h>
@@ -30,11 +13,11 @@
 #include "SignalDecoder.h"
 #include "PwmDecoder.h"
 #include "DacDecoder.h"
-#include "TemperatureSensor.h"
-#include "HumiditySensor.h"
-#include "GasSensor.h"
-#include "LightSensor.h"
-#include "SoilMoistureSensor.h"
+#include "Calibration.h"
+
+// NOTE: The legacy per-sensor wrapper classes (TemperatureSensor, HumiditySensor, etc.)
+// are kept in src/ for reference but are NOT used by OneSensor v2. All 12 channels
+// are handled generically through the ArduinoChannelConfig table and SignalDecoder.
 
 class OneSensor {
 public:
@@ -48,30 +31,75 @@ public:
     void begin();
 
     /**
-     * Call every loop() iteration. Runs signal updates for all channels and checks for serial provisioning commands.
+     * Call every loop() iteration. Runs signal updates for all channels
+     * and checks for serial provisioning commands.
      */
     void update();
 
-    // ─── Sensor readings ────────────────────────────────────────────────────
-    // Returns NAN if the corresponding channel is not valid (no signal, etc.).
+    // ─── 12 Real-Time Sensor Reading Methods ────────────────────────────────
+    // Returns NAN if the corresponding channel is invalid or receiving no signal.
 
-    float readTemperature()  const;   // °C,  range 0–50
-    float readHumidity()     const;   // %,   range 0–100
-    float readGas()          const;   // ppm, range 0–1000
-    float readLight()        const;   // lux, range 0–1000
-    float readSoilMoisture() const;   // %,   range 0–100
+    float readTemperature()  const;   // °C,  dynamic (default 0–50)
+    float readHumidity()     const;   // %,   dynamic (default 0–100)
+    float readGas()          const;   // ppm, dynamic (default 0–1000)
+    float readLight()        const;   // lux, dynamic (default 0–1000)
+    float readSoilMoisture() const;   // %,   dynamic (default 0–100)
+    float readMotionX()      const;   // g,   dynamic (default -2 to +2)
+    float readMotionY()      const;   // g,   dynamic (default -2 to +2)
+    float readMotionZ()      const;   // g,   dynamic (default -2 to +2)
+    float readProximity()    const;   // cm,  dynamic (default 2–400)
+    float readSound()        const;   // dB,  dynamic (default 30–120)
+    float readUV()           const;   // idx, dynamic (default 0–11)
+    float readCO2()          const;   // ppm, dynamic (default 400–5000)
+
+    /**
+     * Generic sensor reader by SensorType enum.
+     */
+    float read(SensorType sensor) const;
+
+    // ─── Dynamic Runtime Configuration ──────────────────────────────────────
+
+    /**
+     * Dynamically update the logical minimum and maximum range for a sensor channel.
+     * Changes take effect immediately in read() without rebooting.
+     * Example: sensor.setRange(SensorType::TEMPERATURE, 0.0f, 100.0f);
+     */
+    bool setRange(SensorType sensor, float min, float max);
+
+    /**
+     * Dynamically update the pin and signal type (PWM or DAC) for a sensor channel.
+     */
+    bool setPin(SensorType sensor, uint8_t pin, SignalType signal = SignalType::PWM);
+
+    /**
+     * Full channel reconfiguration: pin, signal type, min, and max.
+     */
+    bool configureChannel(SensorType sensor, uint8_t pin, SignalType signal, float min, float max);
+
+    /**
+     * Retrieve the active configuration for a sensor channel.
+     */
+    const ArduinoChannelConfig* getChannelConfig(SensorType sensor) const;
+
+    /**
+     * Persist current dynamic configuration to Arduino EEPROM.
+     */
+    void saveConfig();
+
+    /**
+     * Reset configuration to compiled defaults in ARDUINO_CHANNEL_TABLE.
+     */
+    void resetConfig();
 
     // ─── Status ─────────────────────────────────────────────────────────────
 
     /**
-     * Returns true if all configured channels are currently valid.
-     * Individual channel health available via isValid(SensorType).
+     * Returns true if all active channels are receiving valid signals.
      */
     bool isConnected() const;
 
     /**
-     * Returns true if the specified sensor channel has received valid
-     * readings recently (not all timeouts).
+     * Returns true if the specified channel is receiving valid signals.
      */
     bool isValid(SensorType sensor) const;
 
@@ -81,21 +109,10 @@ private:
     DacDecoder _dacDecoders[ARDUINO_CHANNEL_COUNT];
     SignalDecoder* _decoders[ARDUINO_CHANNEL_COUNT];
 
-    // Sensor classes — each holds a pointer to its decoder interface
-    TemperatureSensor   _tempSensor;
-    HumiditySensor      _humSensor;
-    GasSensor           _gasSensor;
-    LightSensor         _lightSensor;
-    SoilMoistureSensor  _soilSensor;
-
-    // Helper to find the decoder for a given SensorType
-    SignalDecoder* _decoderFor(SensorType sensor);
-    const SignalDecoder* _decoderFor(SensorType sensor) const;
-
+    int8_t _channelIndexFor(SensorType sensor) const;
     void _reinitDecoders();
     bool _parseAndApplyProvisioning(const String& line, String& errReason);
     void _checkSerialCommands();
 
     bool _initialized;
 };
-

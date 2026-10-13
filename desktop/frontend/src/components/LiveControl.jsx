@@ -22,7 +22,7 @@ const SENSOR_META = [
 
 const FAULT_TYPES = ['none', 'dropout', 'stuck', 'noise', 'spike', 'drift', 'disconnect', 'latency'];
 
-const API_BASE = 'http://localhost:8000';
+const API_BASE = 'http://127.0.0.1:8000';
 
 // ─── Individual Sensor Card ────────────────────────────────────────────────────
 function LiveSensorCard({ sensor, rawVal, isConnected, onSetValue, activeFault }) {

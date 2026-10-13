@@ -1,5 +1,5 @@
 /**
- * OneSensor.cpp — Public facade implementation with EEPROM pin config and Serial provisioning
+ * OneSensor.cpp — Implementation of OneSensor 12-channel dynamic virtual sensor facade
  */
 
 #include "OneSensor.h"
@@ -9,18 +9,13 @@
 OneSensor::OneSensor()
     : _channels{},
       _decoders{},
-      _tempSensor(nullptr),
-      _humSensor(nullptr),
-      _gasSensor(nullptr),
-      _lightSensor(nullptr),
-      _soilSensor(nullptr),
       _initialized(false)
 {
 }
 
 // ─── begin() ─────────────────────────────────────────────────────────────────
 void OneSensor::begin() {
-    // 1. Load config from EEPROM or compiled defaults
+    // 1. Load config from EEPROM or fallback to compiled defaults
     if (!ArduinoConfigStore::load(_channels, ARDUINO_CHANNEL_COUNT)) {
         for (uint8_t i = 0; i < ARDUINO_CHANNEL_COUNT; i++) {
             _channels[i] = ARDUINO_CHANNEL_TABLE[i];
@@ -43,16 +38,88 @@ void OneSensor::update() {
         if (_decoders[i]) _decoders[i]->update();
     }
 
-    // 2. Non-blocking serial listener for provisioning commands
+    // 2. Non-blocking serial listener for dynamic provisioning commands
     _checkSerialCommands();
 }
 
-// ─── Sensor readings ─────────────────────────────────────────────────────────
-float OneSensor::readTemperature()  const { return _tempSensor.read(); }
-float OneSensor::readHumidity()     const { return _humSensor.read();  }
-float OneSensor::readGas()          const { return _gasSensor.read();  }
-float OneSensor::readLight()        const { return _lightSensor.read(); }
-float OneSensor::readSoilMoisture() const { return _soilSensor.read(); }
+// ─── Dynamic Sensor Readings ─────────────────────────────────────────────────
+float OneSensor::read(SensorType sensor) const {
+    int8_t idx = _channelIndexFor(sensor);
+    if (idx < 0) return NAN;
+
+    const SignalDecoder* dec = _decoders[idx];
+    if (!dec || !dec->isValid()) return NAN;
+
+    // Dynamically uses current outputMin and outputMax
+    return dutyToLogicalValue(
+        dec->getDutyCycle(),
+        CalibrationParams{},
+        _channels[idx].outputMin,
+        _channels[idx].outputMax
+    );
+}
+
+float OneSensor::readTemperature()  const { return read(SensorType::TEMPERATURE);   }
+float OneSensor::readHumidity()     const { return read(SensorType::HUMIDITY);      }
+float OneSensor::readGas()          const { return read(SensorType::GAS);           }
+float OneSensor::readLight()        const { return read(SensorType::LIGHT);         }
+float OneSensor::readSoilMoisture() const { return read(SensorType::SOIL_MOISTURE); }
+float OneSensor::readMotionX()      const { return read(SensorType::MOTION_X);      }
+float OneSensor::readMotionY()      const { return read(SensorType::MOTION_Y);      }
+float OneSensor::readMotionZ()      const { return read(SensorType::MOTION_Z);      }
+float OneSensor::readProximity()    const { return read(SensorType::PROXIMITY);     }
+float OneSensor::readSound()        const { return read(SensorType::SOUND);         }
+float OneSensor::readUV()           const { return read(SensorType::UV);            }
+float OneSensor::readCO2()          const { return read(SensorType::CO2);           }
+
+// ─── Dynamic Runtime Configuration ───────────────────────────────────────────
+bool OneSensor::setRange(SensorType sensor, float min, float max) {
+    if (min >= max) return false;
+    int8_t idx = _channelIndexFor(sensor);
+    if (idx < 0) return false;
+
+    _channels[idx].outputMin = min;
+    _channels[idx].outputMax = max;
+    return true;
+}
+
+bool OneSensor::setPin(SensorType sensor, uint8_t pin, SignalType signal) {
+    int8_t idx = _channelIndexFor(sensor);
+    if (idx < 0) return false;
+
+    _channels[idx].pin = pin;
+    _channels[idx].signal = signal;
+
+    if (signal == SignalType::DAC) {
+        _decoders[idx] = &_dacDecoders[idx];
+    } else {
+        _decoders[idx] = &_pwmDecoders[idx];
+    }
+    return _decoders[idx]->begin(pin);
+}
+
+bool OneSensor::configureChannel(SensorType sensor, uint8_t pin, SignalType signal, float min, float max) {
+    if (!setRange(sensor, min, max)) return false;
+    return setPin(sensor, pin, signal);
+}
+
+const ArduinoChannelConfig* OneSensor::getChannelConfig(SensorType sensor) const {
+    int8_t idx = _channelIndexFor(sensor);
+    if (idx < 0) return nullptr;
+    return &_channels[idx];
+}
+
+void OneSensor::saveConfig() {
+    ArduinoConfigStore::save(_channels, ARDUINO_CHANNEL_COUNT);
+}
+
+void OneSensor::resetConfig() {
+    ArduinoConfigStore::clear();
+    for (uint8_t i = 0; i < ARDUINO_CHANNEL_COUNT; i++) {
+        _channels[i] = ARDUINO_CHANNEL_TABLE[i];
+    }
+    _reinitDecoders();
+}
 
 // ─── Status ──────────────────────────────────────────────────────────────────
 bool OneSensor::isConnected() const {
@@ -64,11 +131,19 @@ bool OneSensor::isConnected() const {
 }
 
 bool OneSensor::isValid(SensorType sensor) const {
-    const SignalDecoder* d = _decoderFor(sensor);
-    return d && d->isValid();
+    int8_t idx = _channelIndexFor(sensor);
+    if (idx < 0) return false;
+    return _decoders[idx] && _decoders[idx]->isValid();
 }
 
-// ─── Private helpers ─────────────────────────────────────────────────────────
+// ─── Private Helpers ─────────────────────────────────────────────────────────
+int8_t OneSensor::_channelIndexFor(SensorType sensor) const {
+    for (uint8_t i = 0; i < ARDUINO_CHANNEL_COUNT; i++) {
+        if (_channels[i].sensor == sensor) return (int8_t)i;
+    }
+    return -1;
+}
+
 void OneSensor::_reinitDecoders() {
     for (uint8_t i = 0; i < ARDUINO_CHANNEL_COUNT; i++) {
         if (_channels[i].signal == SignalType::DAC) {
@@ -81,12 +156,6 @@ void OneSensor::_reinitDecoders() {
             Serial.println(_channels[i].pin);
         }
     }
-
-    _tempSensor  = TemperatureSensor(_decoderFor(SensorType::TEMPERATURE));
-    _humSensor   = HumiditySensor(_decoderFor(SensorType::HUMIDITY));
-    _gasSensor   = GasSensor(_decoderFor(SensorType::GAS));
-    _lightSensor = LightSensor(_decoderFor(SensorType::LIGHT));
-    _soilSensor  = SoilMoistureSensor(_decoderFor(SensorType::SOIL_MOISTURE));
 }
 
 void OneSensor::_checkSerialCommands() {
@@ -98,6 +167,12 @@ void OneSensor::_checkSerialCommands() {
 
     if (line.equalsIgnoreCase("PROVISION")) {
         Serial.println(F("ONESENSOR_ARDUINO_READY_FOR_PROVISIONING"));
+        return;
+    }
+
+    if (line.equalsIgnoreCase("RESET_CONFIG")) {
+        resetConfig();
+        Serial.println(F("{\"status\":\"reset_ok\"}"));
         return;
     }
 
@@ -114,41 +189,33 @@ void OneSensor::_checkSerialCommands() {
 }
 
 bool OneSensor::_parseAndApplyProvisioning(const String& line, String& errReason) {
+    static const char* const SENSOR_KEYS[ARDUINO_CHANNEL_COUNT] = {
+        "temperature", "humidity", "gas", "light", "soil_moisture",
+        "motionX", "motionY", "motionZ", "proximity", "sound", "uv", "co2"
+    };
+
     ArduinoChannelConfig tempTable[ARDUINO_CHANNEL_COUNT];
     for (uint8_t i = 0; i < ARDUINO_CHANNEL_COUNT; i++) {
         tempTable[i] = _channels[i];
     }
 
-    const char* sensorKeys[] = {"temperature", "humidity", "gas", "light", "soil_moisture"};
-
     for (uint8_t s = 0; s < ARDUINO_CHANNEL_COUNT; s++) {
-        int idx = line.indexOf(sensorKeys[s]);
+        int idx = line.indexOf(SENSOR_KEYS[s]);
         if (idx == -1 && s == 4) {
             idx = line.indexOf("soil"); // Alias check
         }
-        if (idx == -1) {
-            errReason = String("missing channel for ") + sensorKeys[s];
-            return false;
-        }
+        if (idx == -1) continue; // Partial provisioning allowed for flexibility
 
-        // Find pin field
+        // Parse Pin
         int pinIdx = line.indexOf("\"pin\"", idx);
-        if (pinIdx == -1) pinIdx = line.indexOf("'pin'", idx);
-        if (pinIdx == -1) {
-            errReason = String("missing pin for ") + sensorKeys[s];
-            return false;
+        if (pinIdx != -1) {
+            int colonIdx = line.indexOf(':', pinIdx);
+            if (colonIdx != -1) {
+                tempTable[s].pin = (uint8_t)line.substring(colonIdx + 1).toInt();
+            }
         }
 
-        int colonIdx = line.indexOf(':', pinIdx);
-        if (colonIdx == -1) {
-            errReason = String("malformed pin field for ") + sensorKeys[s];
-            return false;
-        }
-
-        int pinVal = line.substring(colonIdx + 1).toInt();
-        tempTable[s].pin = (uint8_t)pinVal;
-
-        // Find signal field
+        // Parse Signal
         int sigIdx = line.indexOf("\"signal\"", idx);
         if (sigIdx != -1) {
             int sigColon = line.indexOf(':', sigIdx);
@@ -162,38 +229,34 @@ bool OneSensor::_parseAndApplyProvisioning(const String& line, String& errReason
                 }
             }
         }
-    }
 
-    // Check for duplicate pins
-    for (uint8_t i = 0; i < ARDUINO_CHANNEL_COUNT; i++) {
-        for (uint8_t j = i + 1; j < ARDUINO_CHANNEL_COUNT; j++) {
-            if (tempTable[i].pin == tempTable[j].pin) {
-                errReason = "pin " + String(tempTable[i].pin) + " assigned twice";
-                return false;
+        // Parse dynamic min / outMin
+        int minIdx = line.indexOf("\"min\"", idx);
+        if (minIdx == -1) minIdx = line.indexOf("\"outMin\"", idx);
+        if (minIdx != -1) {
+            int minColon = line.indexOf(':', minIdx);
+            if (minColon != -1) {
+                tempTable[s].outputMin = line.substring(minColon + 1).toFloat();
+            }
+        }
+
+        // Parse dynamic max / outMax
+        int maxIdx = line.indexOf("\"max\"", idx);
+        if (maxIdx == -1) maxIdx = line.indexOf("\"outMax\"", idx);
+        if (maxIdx != -1) {
+            int maxColon = line.indexOf(':', maxIdx);
+            if (maxColon != -1) {
+                tempTable[s].outputMax = line.substring(maxColon + 1).toFloat();
             }
         }
     }
 
-    // Save and re-initialize
+    // Apply & Save to EEPROM
     for (uint8_t i = 0; i < ARDUINO_CHANNEL_COUNT; i++) {
         _channels[i] = tempTable[i];
     }
 
-    ArduinoConfigStore::save(_channels, ARDUINO_CHANNEL_COUNT);
+    saveConfig();
     _reinitDecoders();
     return true;
-}
-
-SignalDecoder* OneSensor::_decoderFor(SensorType sensor) {
-    for (uint8_t i = 0; i < ARDUINO_CHANNEL_COUNT; i++) {
-        if (_channels[i].sensor == sensor) return _decoders[i];
-    }
-    return nullptr;
-}
-
-const SignalDecoder* OneSensor::_decoderFor(SensorType sensor) const {
-    for (uint8_t i = 0; i < ARDUINO_CHANNEL_COUNT; i++) {
-        if (_channels[i].sensor == sensor) return _decoders[i];
-    }
-    return nullptr;
 }

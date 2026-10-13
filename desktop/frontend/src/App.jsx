@@ -406,6 +406,7 @@ export default function App() {
             toolchainStatus={toolchainStatus}
             onFlashESP32={handleFlashESP32}
             onFlashArduino={handleFlashArduino}
+            onRefreshPorts={fetchPorts}
           />
         )}
         {activeTab === 'wizard' && (
