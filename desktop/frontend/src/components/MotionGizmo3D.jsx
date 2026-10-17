@@ -1,5 +1,16 @@
 import React, { useRef, useEffect, useState, useMemo } from 'react';
-import { RotateCw, Compass, Play, Pause } from 'lucide-react';
+import {
+  RotateCw,
+  Compass,
+  Play,
+  Pause,
+  RotateCcw,
+  TrendingUp,
+  Move3d,
+  Layers,
+  Shield,
+  Zap
+} from 'lucide-react';
 
 // ─── 3D Vector & Matrix Math Utilities ─────────────────────────────────────────
 const V3 = {
@@ -23,15 +34,15 @@ const V3 = {
   },
 };
 
-// ─── Preset Orientations ───────────────────────────────────────────────────────
+// ─── Preset Orientations (Disciplined Lucide Icons & 5-Token Palette) ──────────
 const PRESETS = [
-  { label: 'Level Flat', icon: '📐', x: 0, y: 0, z: 1.0, desc: 'Resting flat on workbench' },
-  { label: 'Inverted', icon: '🔄', x: 0, y: 0, z: -1.0, desc: 'Upside down (180°)' },
-  { label: 'Pitch +45°', icon: '↗️', x: 0, y: 0.707, z: 0.707, desc: 'Nose pitched upwards' },
-  { label: 'Roll +45°', icon: '↘️', x: 0.707, y: 0, z: 0.707, desc: 'Tilted rightwards' },
-  { label: 'Portrait', icon: '📱', x: 0, y: 1.0, z: 0, desc: 'Standing vertical' },
-  { label: 'Zero-G (0g)', icon: '🪂', x: 0, y: 0, z: 0, desc: 'Freefall simulation' },
-  { label: 'High-G Shock', icon: '🚀', x: 1.4, y: 1.4, z: 1.4, desc: 'Extreme acceleration' },
+  { label: 'Level Flat', icon: Compass, x: 0, y: 0, z: 1.0, desc: 'Resting flat on workbench' },
+  { label: 'Inverted', icon: RotateCcw, x: 0, y: 0, z: -1.0, desc: 'Upside down (180°)' },
+  { label: 'Pitch +45°', icon: TrendingUp, x: 0, y: 0.707, z: 0.707, desc: 'Nose pitched upwards' },
+  { label: 'Roll +45°', icon: Move3d, x: 0.707, y: 0, z: 0.707, desc: 'Tilted rightwards' },
+  { label: 'Portrait', icon: Layers, x: 0, y: 1.0, z: 0, desc: 'Standing vertical' },
+  { label: 'Zero-G (0g)', icon: Shield, x: 0, y: 0, z: 0, desc: 'Freefall simulation' },
+  { label: 'High-G Shock', icon: Zap, x: 1.4, y: 1.4, z: 1.4, desc: 'Extreme acceleration' },
 ];
 
 export default function MotionGizmo3D({ accelX = 0, accelY = 0, accelZ = 1, onSetMotion }) {
@@ -87,7 +98,7 @@ export default function MotionGizmo3D({ accelX = 0, accelY = 0, accelZ = 1, onSe
       tagColor = '#f59e0b';
     } else if (Math.abs(pitchRad) > 0.45 || Math.abs(rollRad) > 0.45) {
       stateTag = 'TILTED ORIENTATION';
-      tagColor = '#8b5cf6';
+      tagColor = '#2563eb';
     }
 
     return {
@@ -913,7 +924,7 @@ export default function MotionGizmo3D({ accelX = 0, accelY = 0, accelZ = 1, onSe
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {/* Axis X */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <span style={{ width: '80px', fontSize: '11px', color: '#f472b6', fontFamily: 'monospace', fontWeight: 'bold' }}>
+            <span style={{ width: '80px', fontSize: '11px', color: 'var(--color-primary)', fontFamily: 'var(--font-mono)', fontWeight: 'bold' }}>
               X (Roll):
             </span>
             <input
@@ -923,16 +934,16 @@ export default function MotionGizmo3D({ accelX = 0, accelY = 0, accelZ = 1, onSe
               step="0.02"
               value={accelX}
               onChange={(e) => onSetMotion && onSetMotion(Number(e.target.value), accelY, accelZ)}
-              style={{ flex: 1, accentColor: '#f472b6' }}
+              style={{ flex: 1, accentColor: 'var(--color-primary)' }}
             />
-            <span style={{ width: '45px', textAlign: 'right', fontSize: '11px', fontFamily: 'monospace', color: '#fff' }}>
+            <span style={{ width: '45px', textAlign: 'right', fontSize: '11px', fontFamily: 'var(--font-mono)', color: '#fff' }}>
               {Number(accelX).toFixed(2)}g
             </span>
           </div>
 
           {/* Axis Y */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <span style={{ width: '80px', fontSize: '11px', color: '#a78bfa', fontFamily: 'monospace', fontWeight: 'bold' }}>
+            <span style={{ width: '80px', fontSize: '11px', color: 'var(--color-cyan)', fontFamily: 'var(--font-mono)', fontWeight: 'bold' }}>
               Y (Pitch):
             </span>
             <input
@@ -942,16 +953,16 @@ export default function MotionGizmo3D({ accelX = 0, accelY = 0, accelZ = 1, onSe
               step="0.02"
               value={accelY}
               onChange={(e) => onSetMotion && onSetMotion(accelX, Number(e.target.value), accelZ)}
-              style={{ flex: 1, accentColor: '#a78bfa' }}
+              style={{ flex: 1, accentColor: 'var(--color-cyan)' }}
             />
-            <span style={{ width: '45px', textAlign: 'right', fontSize: '11px', fontFamily: 'monospace', color: '#fff' }}>
+            <span style={{ width: '45px', textAlign: 'right', fontSize: '11px', fontFamily: 'var(--font-mono)', color: '#fff' }}>
               {Number(accelY).toFixed(2)}g
             </span>
           </div>
 
           {/* Axis Z */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <span style={{ width: '80px', fontSize: '11px', color: '#818cf8', fontFamily: 'monospace', fontWeight: 'bold' }}>
+            <span style={{ width: '80px', fontSize: '11px', color: 'var(--color-primary)', fontFamily: 'var(--font-mono)', fontWeight: 'bold' }}>
               Z (Yaw):
             </span>
             <input
@@ -961,9 +972,9 @@ export default function MotionGizmo3D({ accelX = 0, accelY = 0, accelZ = 1, onSe
               step="0.02"
               value={accelZ}
               onChange={(e) => onSetMotion && onSetMotion(accelX, accelY, Number(e.target.value))}
-              style={{ flex: 1, accentColor: '#818cf8' }}
+              style={{ flex: 1, accentColor: 'var(--color-primary)' }}
             />
-            <span style={{ width: '45px', textAlign: 'right', fontSize: '11px', fontFamily: 'monospace', color: '#fff' }}>
+            <span style={{ width: '45px', textAlign: 'right', fontSize: '11px', fontFamily: 'var(--font-mono)', color: '#fff' }}>
               {Number(accelZ).toFixed(2)}g
             </span>
           </div>
@@ -971,7 +982,7 @@ export default function MotionGizmo3D({ accelX = 0, accelY = 0, accelZ = 1, onSe
 
         {/* Quick Orientation Presets Buttons */}
         <div>
-          <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)', fontFamily: 'monospace', marginBottom: '8px', letterSpacing: '0.5px' }}>
+          <div style={{ fontSize: '10px', color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', marginBottom: '8px', letterSpacing: '0.04em' }}>
             ORIENTATION PRESETS:
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
@@ -980,6 +991,7 @@ export default function MotionGizmo3D({ accelX = 0, accelY = 0, accelZ = 1, onSe
                 Math.abs(accelX - p.x) < 0.08 &&
                 Math.abs(accelY - p.y) < 0.08 &&
                 Math.abs(accelZ - p.z) < 0.08;
+              const PresetIcon = p.icon;
               return (
                 <button
                   key={p.label}
@@ -989,19 +1001,19 @@ export default function MotionGizmo3D({ accelX = 0, accelY = 0, accelZ = 1, onSe
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '4px',
+                    gap: '5px',
                     padding: '4px 8px',
-                    borderRadius: '4px',
+                    borderRadius: 'var(--radius-sm)',
                     fontSize: '11px',
                     fontWeight: '600',
-                    background: isMatch ? 'rgba(56,189,248,0.25)' : 'rgba(255,255,255,0.05)',
-                    border: isMatch ? '1px solid #38bdf8' : '1px solid rgba(255,255,255,0.1)',
-                    color: isMatch ? '#fff' : 'rgba(255,255,255,0.7)',
+                    background: isMatch ? 'rgba(56, 189, 248, 0.2)' : 'rgba(255, 255, 255, 0.04)',
+                    border: isMatch ? '1px solid var(--color-cyan)' : '1px solid var(--border-color)',
+                    color: isMatch ? '#fff' : 'var(--text-muted)',
                     cursor: 'pointer',
-                    transition: 'all 0.15s ease',
+                    transition: 'all var(--motion-fast)',
                   }}
                 >
-                  <span>{p.icon}</span>
+                  <PresetIcon size={12} color={isMatch ? 'var(--color-cyan)' : 'var(--text-dim)'} />
                   <span>{p.label}</span>
                 </button>
               );

@@ -176,7 +176,7 @@ export default function ConfigEditor({ configState, configError, onApplyConfig, 
           style={{
             background: 'rgba(239, 68, 68, 0.12)',
             border: '1px solid rgba(239, 68, 68, 0.35)',
-            color: '#fca5a5',
+            color: 'var(--color-danger, #DC4545)',
             padding: '12px 18px',
             borderRadius: 'var(--radius-md)',
             fontSize: '13px',
@@ -199,7 +199,7 @@ export default function ConfigEditor({ configState, configError, onApplyConfig, 
           style={{
             background: 'rgba(16, 185, 129, 0.12)',
             border: '1px solid rgba(16, 185, 129, 0.35)',
-            color: '#6ee7b7',
+            color: 'var(--color-success, #15966A)',
             padding: '12px 18px',
             borderRadius: 'var(--radius-md)',
             fontSize: '13px',
@@ -229,7 +229,7 @@ export default function ConfigEditor({ configState, configError, onApplyConfig, 
 
       {/* Main Matrix Table Card */}
       <div
-        className="interactive-card"
+        className="interactive-card config-matrix-panel"
         style={{
           background: 'var(--bg-card)',
           border: '1px solid var(--border-color)',
@@ -474,7 +474,7 @@ export default function ConfigEditor({ configState, configError, onApplyConfig, 
 
         {/* 1. ESP32 Pinout Allocation Map (Highest value animation target) */}
         <div
-          className="interactive-card"
+          className="interactive-card config-matrix-panel"
           style={{
             background: 'var(--bg-card)',
             border: '1px solid var(--border-color)',
@@ -511,11 +511,11 @@ export default function ConfigEditor({ configState, configError, onApplyConfig, 
                 if (assigned.signal === 'dac') {
                   bg = 'rgba(239, 68, 68, 0.15)';
                   border = '#ef4444';
-                  color = '#fca5a5';
+                  color = 'var(--color-danger, #DC4545)';
                 } else {
                   bg = 'rgba(37, 99, 235, 0.15)';
                   border = 'var(--color-primary)';
-                  color = '#93c5fd';
+                  color = 'var(--accent-primary, #4263EB)';
                 }
               }
 
@@ -547,15 +547,15 @@ export default function ConfigEditor({ configState, configError, onApplyConfig, 
           </div>
 
           <div style={{ display: 'flex', gap: '16px', fontSize: '11px', color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', marginTop: 'auto' }}>
-            <span>DAC: <strong style={{ color: '#fca5a5' }}>{dacAssignedCount}/2</strong></span>
-            <span>PWM: <strong style={{ color: '#93c5fd' }}>{pwmAssignedCount}/16</strong></span>
+            <span>DAC: <strong style={{ color: 'var(--color-danger, #DC4545)' }}>{dacAssignedCount}/2</strong></span>
+            <span>PWM: <strong style={{ color: 'var(--accent-primary, #4263EB)' }}>{pwmAssignedCount}/16</strong></span>
             <span>AVAILABLE: <strong style={{ color: 'var(--text-muted)' }}>{ALL_ESP32_PINS.length - assignedPins.size}</strong></span>
           </div>
         </div>
 
         {/* 2. Waveform Calibration Engine Reference Card */}
         <div
-          className="interactive-card"
+          className="interactive-card config-matrix-panel"
           style={{
             background: 'var(--bg-card)',
             border: '1px solid var(--border-color)',
@@ -600,7 +600,7 @@ export default function ConfigEditor({ configState, configError, onApplyConfig, 
 
         {/* 3. NVS Storage Status & Arduino Jumper Reference */}
         <div
-          className="interactive-card"
+          className="interactive-card config-matrix-panel"
           style={{
             background: 'var(--bg-card)',
             border: '1px solid var(--border-color)',
@@ -625,11 +625,11 @@ export default function ConfigEditor({ configState, configError, onApplyConfig, 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '12px', fontFamily: 'var(--font-mono)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: '4px' }}>
               <span>Temp (DAC1) → Arduino</span>
-              <strong style={{ color: '#fca5a5' }}>PIN A0 (0–50°C)</strong>
+              <strong style={{ color: 'var(--color-danger)' }}>PIN A0 (0–50°C)</strong>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: '4px' }}>
               <span>Humidity (DAC2) → Arduino</span>
-              <strong style={{ color: '#38bdf8' }}>PIN A1 (0–100%)</strong>
+              <strong style={{ color: 'var(--color-cyan)' }}>PIN A1 (0–100%)</strong>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: '4px' }}>
               <span>Gas / Light / Soil → Arduino</span>
@@ -637,15 +637,15 @@ export default function ConfigEditor({ configState, configError, onApplyConfig, 
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: '4px' }}>
               <span>Motion X/Y/Z → Arduino</span>
-              <strong style={{ color: '#f472b6' }}>PINS D5, D6, D7</strong>
+              <strong style={{ color: 'var(--color-primary)' }}>PINS D5, D6, D7</strong>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: '4px' }}>
               <span>Proximity / Sound → Arduino</span>
-              <strong style={{ color: '#fb923c' }}>PINS D8, D9</strong>
+              <strong style={{ color: 'var(--color-primary)' }}>PINS D8, D9</strong>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: '4px' }}>
               <span>UV / CO₂ → Arduino</span>
-              <strong style={{ color: '#fbbf24' }}>PINS D10, D11</strong>
+              <strong style={{ color: 'var(--color-warning)' }}>PINS D10, D11</strong>
             </div>
           </div>
 

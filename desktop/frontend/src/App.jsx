@@ -1,36 +1,44 @@
-import React, { useState, useEffect, useRef } from 'react';
-import Badge from './components/Badge';
+﻿import React, { useState, useEffect, useRef } from 'react';
+import TopBar from './components/TopBar';
+import Sidebar, { WORKFLOW_NAV } from './components/Sidebar';
+import StatusBar from './components/StatusBar';
+import OverviewPage from './components/OverviewPage';
 import LiveControl from './components/LiveControl';
+import HardwarePage from './components/HardwarePage';
 import ConfigEditor from './components/ConfigEditor';
 import ScenarioBuilder from './components/ScenarioBuilder';
+import FaultInjection from './components/FaultInjection';
 import FlashPanel from './components/FlashPanel';
 import SetupWizard from './components/SetupWizard';
 import ConsoleLog from './components/ConsoleLog';
-import FaultInjection from './components/FaultInjection';
-import { Activity, Sliders, TrendingUp, Zap, HelpCircle, Terminal, Radio, ShieldOff } from 'lucide-react';
+import DemoModeOverlay, { DEMO_STEPS } from './components/DemoModeOverlay';
+import CommandPalette from './components/CommandPalette';
+import LandingPage from './components/LandingPage';
+import OneSensorLogo from './components/OneSensorLogo';
 
 const API_BASE = 'http://127.0.0.1:8000';
 const WS_URL = 'ws://127.0.0.1:8000/ws';
 
-const TABS = [
-  { id: 'live',         label: 'Live Control',    sub: 'Transducers', icon: Activity },
-  { id: 'config',       label: 'Config Editor',   sub: 'Pin Matrix',  icon: Sliders },
-  { id: 'scenario',     label: 'Scenario Builder',sub: 'Waveforms',   icon: TrendingUp },
-  { id: 'fault_inject', label: 'Fault Injection', sub: 'Chaos Engine',icon: ShieldOff },
-  { id: 'flash',        label: 'Flash Panel',     sub: 'Bootloader',  icon: Zap },
-  { id: 'wizard',       label: 'Setup Wizard',    sub: 'Provisioning',icon: HelpCircle },
-  { id: 'logs',         label: 'Console & Serial',sub: 'Telemetry',   icon: Terminal },
-];
-
 export default function App() {
-  const [activeTab, setActiveTab] = useState('live');
+  // Application State Separation: 'landing' (State A) | 'workbench' (State B)
+  const [currentView, setCurrentView] = useState(() => {
+    return window.location.hash.includes('workbench') ? 'workbench' : 'landing';
+  });
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const [activeTab, setActiveTab] = useState('overview');
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
+  const [isDemoActive, setIsDemoActive] = useState(false);
+  const [demoStepIndex, setDemoStepIndex] = useState(0);
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+
   const [sensorState, setSensorState] = useState({
-    temperature: 25, humidity: 50, gas: 300, light: 500, soil: 50,
-    motionX: 0, motionY: 0, motionZ: 1,
-    proximity: 50, sound: 40, uv: 2, co2: 420,
+    temperature: 24.8, humidity: 52.0, gas: 280, light: 620, soil: 42,
+    motionX: 0.05, motionY: -0.12, motionZ: 0.98,
+    proximity: 24, sound: 58, uv: 4.2, co2: 510,
     faults: {}
   });
+
   const [configState, setConfigState] = useState({ channels: [] });
   const [configError, setConfigError] = useState(null);
   const [ports, setPorts] = useState([]);
@@ -39,10 +47,66 @@ export default function App() {
 
   const wsRef = useRef(null);
 
+  // State A -> State B Transition with visual bridge (Â§1)
+  const handleEnterWorkbench = (targetTab = 'overview') => {
+    if (isTransitioning) return;
+    setIsTransitioning(true);
+    if (targetTab) setActiveTab(targetTab);
+    window.history.pushState({ view: 'workbench', tab: targetTab }, '', '#workbench');
+
+    setTimeout(() => {
+      setCurrentView('workbench');
+      setIsTransitioning(false);
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    }, 380);
+  };
+
+  // State B -> State A Return to Landing
+  const handleBackToLanding = () => {
+    if (isTransitioning) return;
+    setIsTransitioning(true);
+    window.history.pushState({ view: 'landing' }, '', window.location.pathname);
+
+    setTimeout(() => {
+      setCurrentView('landing');
+      setIsTransitioning(false);
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    }, 350);
+  };
+
+  // Browser Back/Forward navigation support
+  useEffect(() => {
+    const handlePopState = (e) => {
+      if (e.state && e.state.view === 'workbench') {
+        setCurrentView('workbench');
+        if (e.state.tab) setActiveTab(e.state.tab);
+      } else if (window.location.hash.includes('workbench')) {
+        setCurrentView('workbench');
+      } else {
+        setCurrentView('landing');
+      }
+      window.scrollTo(0, 0);
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
   const addLog = (message, type = 'info', source = 'system') => {
     const timestamp = new Date().toLocaleTimeString();
     setLogs(prev => [...prev.slice(-300), { timestamp, message, type, source }]);
   };
+
+  // Keyboard shortcut Ctrl+K / Cmd+K for Command Palette (Â§42)
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        setIsCommandPaletteOpen(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   // Connect local WebSocket to Python sidecar
   useEffect(() => {
@@ -303,145 +367,183 @@ export default function App() {
     }
   };
 
+  const handleRunDemo = () => {
+    setDemoStepIndex(0);
+    setIsDemoActive(true);
+  };
+
+  // Find active label for breadcrumb
+  let activeTabLabel = activeTab;
+  for (const sec of WORKFLOW_NAV) {
+    const item = sec.items.find(i => i.id === activeTab);
+    if (item) {
+      activeTabLabel = item.label;
+      break;
+    }
+  }
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', backgroundColor: 'var(--bg-main)' }}>
-      {/* ── Top Header ── */}
-      <header className="app-header">
-        {/* Brand Block */}
-        <div className="brand">
-          <div className="brand-icon">
-            <Radio size={20} color="#fff" />
-          </div>
-          <div className="brand-text">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <h1>OneSensor Control Suite</h1>
-              <Badge variant="neutral" size="sm">v2.0.0</Badge>
+    <div className={`app-shell ${isTransitioning ? 'transitioning' : ''}`}>
+      {/* â”€â”€ Transition Visual Bridge Overlay (Â§1) â”€â”€ */}
+      {isTransitioning && (
+        <div className="view-transition-overlay" aria-hidden="true">
+          <div className="transition-spinner-box">
+            <OneSensorLogo height={32} variant="mark" />
+            <div className="transition-loading-bar">
+              <div className="transition-loading-fill" />
             </div>
-            <p>PRECISION MULTI-CHANNEL TRANSDUCER EMULATOR</p>
+            <span className="transition-loading-label">INITIALIZING WORKBENCH ENVIRONMENT...</span>
           </div>
         </div>
+      )}
 
-        {/* Tab Navigation (6 two-line pill buttons with sliding indicator) */}
-        <nav className="nav-tabs">
-          {TABS.map(tab => {
-            const isActive = activeTab === tab.id;
-            const Icon = tab.icon;
-            return (
-              <button
-                key={tab.id}
-                className={`tab-btn ${isActive ? 'active' : ''}`}
-                onClick={() => setActiveTab(tab.id)}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Icon size={14} />
-                  <span>{tab.label}</span>
-                </div>
-                <span style={{ fontSize: '10px', opacity: isActive ? 0.9 : 0.6, fontFamily: 'var(--font-mono)' }}>
-                  {tab.sub}
-                </span>
-              </button>
-            );
-          })}
-        </nav>
+      {/* â”€â”€ STATE A: OneSensor Landing Page (Â§1) â”€â”€ */}
+      {currentView === 'landing' && (
+        <LandingPage
+          sensorState={sensorState}
+          isConnected={isConnected}
+          onEnterWorkbench={handleEnterWorkbench}
+          isTransitioning={isTransitioning}
+        />
+      )}
 
-        {/* Connection Status Badge (Dot + two-line telemetry with crossfade) */}
-        <div
-          className="status-badge"
-          style={{
-            background: isConnected ? 'rgba(16, 185, 129, 0.08)' : 'rgba(239, 68, 68, 0.08)',
-            borderColor: isConnected ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)',
-          }}
-        >
-          <div className={`status-dot ${isConnected ? 'connected' : 'disconnected'}`} />
-          <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'left', lineHeight: '1.2' }}>
-            <span style={{ color: isConnected ? '#34d399' : '#f87171', fontWeight: '700', fontSize: '11px', fontFamily: 'var(--font-mono)' }}>
-              {isConnected ? 'BACKEND LINKED' : 'SIDECAR OFFLINE'}
-            </span>
-            <span style={{ fontSize: '10px', color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>
-              {isConnected ? 'PORT 8000 WS OK' : 'RECONNECTING…'}
-            </span>
+      {/* â”€â”€ STATE B: OneSensor Virtual Workbench (Â§1, Â§8, Â§9) â”€â”€ */}
+      {currentView === 'workbench' && (
+        <div className="workbench-shell animate-fade-in">
+          {/* Top Bar with Return to Landing control */}
+          <TopBar
+            activeTab={activeTab}
+            activeTabLabel={activeTabLabel}
+            isConnected={isConnected}
+            onRunDemo={handleRunDemo}
+            isDemoActive={isDemoActive}
+            onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
+            onBackToLanding={handleBackToLanding}
+          />
+
+          <div className={`app-body-layout ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
+            <Sidebar
+              activeTab={activeTab}
+              onSelectTab={setActiveTab}
+              isCollapsed={isSidebarCollapsed}
+              onToggleCollapse={() => setIsSidebarCollapsed(prev => !prev)}
+            />
+
+            <main className="workstation-content">
+              {activeTab === 'overview' && (
+                <OverviewPage
+                  sensorState={sensorState}
+                  isConnected={isConnected}
+                  onSelectTab={setActiveTab}
+                  onRunDemo={handleRunDemo}
+                  onSetValue={handleSetValue}
+                  onInjectFault={handleInjectFault}
+                />
+              )}
+              {activeTab === 'live' && (
+                <LiveControl
+                  state={sensorState}
+                  onSetValue={handleSetValue}
+                  onSetMotion={handleSetMotion}
+                  onInjectFault={handleInjectFault}
+                  onClearFault={handleClearFault}
+                  onConnectESP32={handleConnectESP32}
+                />
+              )}
+              {activeTab === 'scenario' && (
+                <ScenarioBuilder
+                  onStartRamp={handleStartRamp}
+                  onStartStatic={handleStartStatic}
+                  onStopScenario={handleStopScenario}
+                  onStopAll={handleStopAllScenarios}
+                  onInjectFault={handleInjectFault}
+                  onClearFault={handleClearFault}
+                />
+              )}
+              {activeTab === 'fault_inject' && (
+                <FaultInjection
+                  onInjectFault={handleInjectFault}
+                  onClearFault={handleClearFault}
+                />
+              )}
+              {activeTab === 'hardware_3d' && (
+                <HardwarePage
+                  sensorState={sensorState}
+                />
+              )}
+              {activeTab === 'config' && (
+                <ConfigEditor
+                  configState={configState}
+                  configError={configError}
+                  onApplyConfig={handleApplyConfig}
+                  onResetConfig={handleResetConfig}
+                />
+              )}
+              {activeTab === 'flash' && (
+                <FlashPanel
+                  ports={ports}
+                  toolchainStatus={toolchainStatus}
+                  onFlashESP32={handleFlashESP32}
+                  onFlashArduino={handleFlashArduino}
+                />
+              )}
+              {activeTab === 'wizard' && (
+                <SetupWizard
+                  ports={ports}
+                  onFlashESP32={handleFlashESP32}
+                  onProvisionESP32={handleProvisionESP32}
+                  onBuildFlashESP32={handleBuildFlashESP32}
+                  onFlashArduino={handleFlashArduino}
+                  onProvisionArduino={handleProvisionArduino}
+                  onFinishWizard={() => setActiveTab('live')}
+                />
+              )}
+              {activeTab === 'logs' && (
+                <ConsoleLog
+                  logs={logs}
+                  ports={ports}
+                  onStartSerialMonitor={handleStartSerialMonitor}
+                  onStopSerialMonitor={handleStopSerialMonitor}
+                  onClear={handleClearLogs}
+                />
+              )}
+            </main>
           </div>
-        </div>
-      </header>
 
-      {/* ── Main Content Area (Crossfade tab content, pauses inactive tabs) ── */}
-      <main className="main-container" style={{ flex: 1 }}>
-        {activeTab === 'live' && (
-          <LiveControl
-            state={sensorState}
-            onSetValue={handleSetValue}
-            onSetMotion={handleSetMotion}
-            onInjectFault={handleInjectFault}
-            onClearFault={handleClearFault}
-            onConnectESP32={handleConnectESP32}
+          <StatusBar
+            isConnected={isConnected}
+            sensorCount={12}
           />
-        )}
-        {activeTab === 'config' && (
-          <ConfigEditor
-            configState={configState}
-            configError={configError}
-            onApplyConfig={handleApplyConfig}
-            onResetConfig={handleResetConfig}
-          />
-        )}
-        {activeTab === 'scenario' && (
-          <ScenarioBuilder
-            onStartRamp={handleStartRamp}
-            onStartStatic={handleStartStatic}
-            onStopScenario={handleStopScenario}
-            onStopAll={handleStopAllScenarios}
-            onInjectFault={handleInjectFault}
-            onClearFault={handleClearFault}
-          />
-        )}
-        {activeTab === 'fault_inject' && (
-          <FaultInjection
-            onInjectFault={handleInjectFault}
-            onClearFault={handleClearFault}
-          />
-        )}
-        {activeTab === 'flash' && (
-          <FlashPanel
-            ports={ports}
-            toolchainStatus={toolchainStatus}
-            onFlashESP32={handleFlashESP32}
-            onFlashArduino={handleFlashArduino}
-            onRefreshPorts={fetchPorts}
-          />
-        )}
-        {activeTab === 'wizard' && (
-          <SetupWizard
-            ports={ports}
-            onFlashESP32={handleFlashESP32}
-            onProvisionESP32={handleProvisionESP32}
-            onBuildFlashESP32={handleBuildFlashESP32}
-            onFlashArduino={handleFlashArduino}
-            onProvisionArduino={handleProvisionArduino}
-            onFinishWizard={() => setActiveTab('live')}
-          />
-        )}
-        {activeTab === 'logs' && (
-          <ConsoleLog
-            logs={logs}
-            ports={ports}
-            onStartSerialMonitor={handleStartSerialMonitor}
-            onStopSerialMonitor={handleStopSerialMonitor}
-            onClear={handleClearLogs}
-          />
-        )}
-      </main>
+        </div>
+      )}
 
-      {/* ── Footer Diagnostics Bar ── */}
-      <footer className="app-footer">
-        <div className="footer-telemetry">
-          <span>SESSION: <strong>0x4F1A</strong></span>
-          <span>BAUD: <strong>115200 8N1</strong></span>
-          <span>CORE: <strong>v2.0-SYNTH</strong></span>
-        </div>
-        <div>
-          <span>ONESENSOR DESKTOP CONTROL SUITE • v2.0.0</span>
-        </div>
-      </footer>
+      {/* â”€â”€ Judge Demo Mode Controller (Â§11) â”€â”€ */}
+      {isDemoActive && (
+        <DemoModeOverlay
+          currentStepIndex={demoStepIndex}
+          onNextStep={() => setDemoStepIndex(prev => Math.min(prev + 1, DEMO_STEPS.length - 1))}
+          onPrevStep={() => setDemoStepIndex(prev => Math.max(prev - 1, 0))}
+          onExitDemo={() => setIsDemoActive(false)}
+          onSelectTab={setActiveTab}
+          onSetValue={handleSetValue}
+          onInjectFault={handleInjectFault}
+          onClearFault={handleClearFault}
+        />
+      )}
+
+      {/* â”€â”€ Global Command Palette (Â§42) â”€â”€ */}
+      <CommandPalette
+        isOpen={isCommandPaletteOpen}
+        onClose={() => setIsCommandPaletteOpen(false)}
+        onSelectTab={(tab) => {
+          if (currentView !== 'workbench') {
+            handleEnterWorkbench(tab);
+          } else {
+            setActiveTab(tab);
+          }
+        }}
+        onRunDemo={handleRunDemo}
+      />
     </div>
   );
 }

@@ -1,0 +1,75 @@
+<USER_REQUEST>
+analyze current project and i have to modify ui don't go into the onesensor library part of cpp or c code i want to change the ui only so 
+
+# MASTER PROMPT: OneSensor — Complete UI/UX Redesign
+
+## 1. Role and objective
+
+Act as a senior product designer, UI/UX architect, frontend engineer, interaction designer, and design systems specialist.
+
+Completely redesign the existing **OneSensor — Virtual Sensor Workbench** into a polished, credible, professional IoT engineering application.
+
+This is a full application-wide redesign, not a cosmetic refresh. Improve the information architecture, layout, typography, component system, hardware visualization, charts, interaction patterns, responsive behavior, and animations across every existing page.
+
+The result must feel like a real engineering instrument used by embedded developers to configure, simulate, inspect, and test virtual sensors.
+
+**Do not create another generic AI-generated SaaS dashboard. Do not make the application look like a gaming HUD, cyberpunk control room, cryptocurrency terminal, or futuristic concept mockup.**
+
+The interface must be attractive because of its hierarchy, precision, consistency, useful data visualization, and interaction quality—not because of decorative effects.
+
+## 2. Mandatory first phase: inspect the complete repository
+
+Before writing code or changing the interface, inspect the existing project thoroughly.
+
+Identify:
+
+- Framework, build system, entry points, routing, and application structure.
+- Every page, route, modal, drawer, tab, form, and shared component.
+- Existing stylesheets, design tokens, icon libraries, fonts, chart libraries, animation libraries, and 3D rendering implementation.
+- State management, API clients, backend endpoints, WebSocket connections, serial communication, and hardware integration.
+- Sensor data models, channel identifiers, GPIO mappings, configuration persistence, scenario execution, fault injection, firmware flashing, and device setup logic.
+- Existing lo
+<truncated 30542 bytes>
+tently.
+- The application has one coherent visual identity.
+- The UI feels like professional engineering software rather than an AI-generated template.
+- The main tasks are easy to understand and operate.
+- All 12 sensor channels remain accessible.
+- Charts represent actual generated or received data.
+- Hardware and sensor models are accurately represented.
+- All status indicators are grounded in real application state.
+- Existing working functionality is preserved.
+- Interactive controls perform their advertised actions.
+- Transitions are restrained and responsive.
+- The application works at desktop, tablet, and mobile sizes.
+- The build succeeds and introduced errors are fixed.
+
+## 22. Final deliverables
+
+After implementation, provide:
+
+1. A concise summary of the redesign.
+2. The final route/page inventory.
+3. The shared component and design-token structure.
+4. The list of files changed.
+5. Any unresolved backend or hardware limitations.
+6. Build and test results.
+7. Screenshots of the redesigned Overview, Live Sensors, Scenarios, Fault Lab, and Devices & 3D pages.
+
+Do not stop after producing a plan or a static design. Inspect, implement, validate, and finish the actual application using the existing repository.
+
+**Final design principle: OneSensor should look like a carefully engineered instrument for working with virtual sensors—not a collection of futuristic dashboard widgets.**
+</USER_REQUEST>
+<ADDITIONAL_METADATA>
+The current local time is: 2026-10-17T10:01:23+05:30.
+
+The user's current state is as follows:
+Active Document: c:\blockchain\suyog\One-Sensor\desktop\frontend\vite.config.js (LANGUAGE_JAVASCRIPT)
+Cursor is on line: 1
+Other open documents:
+- c:\blockchain\suyog\One-Sensor\run.ps1 (LANGUAGE_POWERSHELL)
+- c:\blockchain\suyog\One-Sensor\desktop\frontend\vite.config.js (LANGUAGE_JAVASCRIPT)
+- c:\blockchain\suyog\One-Sensor\run.bat (LANGUAGE_UNSPECIFIED)
+Running terminal commands:
+- ./run.bat (in c:\blockchain\suyog\One-Sensor, running for 17m53s)
+</ADDITIONAL_METADATA>

@@ -19,7 +19,7 @@ const ARDUINO_STAGES = [
   { label: 'Success! Arduino firmware written.', pct: 100 },
 ];
 
-export default function FlashPanel({ ports, onFlashESP32, onFlashArduino, toolchainStatus, onRefreshPorts }) {
+export default function FlashPanel({ ports, onFlashESP32, onFlashArduino, toolchainStatus }) {
   const [selectedPortESP, setSelectedPortESP] = useState('');
   const [selectedPortUno, setSelectedPortUno] = useState('');
 
@@ -56,7 +56,6 @@ export default function FlashPanel({ ports, onFlashESP32, onFlashArduino, toolch
 
   const handleRefreshClick = () => {
     setIsRefreshingPorts(true);
-    if (onRefreshPorts) onRefreshPorts();
     setTimeout(() => setIsRefreshingPorts(false), 500);
   };
 
@@ -184,9 +183,8 @@ export default function FlashPanel({ ports, onFlashESP32, onFlashArduino, toolch
 
         {/* ── 1. ESP32 Flash Card ── */}
         <div
-          className="interactive-card"
+          className="interactive-card firmware-esp32-card"
           style={{
-            background: 'var(--bg-card)',
             border: `1px solid ${espBusy ? 'var(--color-primary)' : 'var(--border-color)'}`,
             borderRadius: 'var(--radius-lg)',
             padding: '24px',
@@ -291,7 +289,7 @@ export default function FlashPanel({ ports, onFlashESP32, onFlashArduino, toolch
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px', fontSize: '12px' }}>
               <span
                 style={{
-                  color: espStatus.isError ? '#f87171' : espStatus.isSuccess ? '#34d399' : 'var(--text-muted)',
+                  color: espStatus.isError ? 'var(--color-danger, #DC4545)' : espStatus.isSuccess ? 'var(--color-success, #15966A)' : 'var(--text-muted)',
                   fontWeight: '600',
                   transition: 'color var(--motion-fast)',
                 }}
@@ -354,9 +352,8 @@ export default function FlashPanel({ ports, onFlashESP32, onFlashArduino, toolch
 
         {/* ── 2. Arduino Uno Flash Card ── */}
         <div
-          className="interactive-card"
+          className="interactive-card firmware-arduino-card"
           style={{
-            background: 'var(--bg-card)',
             border: `1px solid ${unoBusy ? 'var(--color-cyan)' : 'var(--border-color)'}`,
             borderRadius: 'var(--radius-lg)',
             padding: '24px',
@@ -461,7 +458,7 @@ export default function FlashPanel({ ports, onFlashESP32, onFlashArduino, toolch
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px', fontSize: '12px' }}>
               <span
                 style={{
-                  color: unoStatus.isError ? '#f87171' : unoStatus.isSuccess ? '#34d399' : 'var(--text-muted)',
+                  color: unoStatus.isError ? 'var(--color-danger, #DC4545)' : unoStatus.isSuccess ? 'var(--color-success, #15966A)' : 'var(--text-muted)',
                   fontWeight: '600',
                   transition: 'color var(--motion-fast)',
                 }}
@@ -504,7 +501,7 @@ export default function FlashPanel({ ports, onFlashESP32, onFlashArduino, toolch
             style={{
               marginTop: 'auto',
               background: 'var(--color-cyan)',
-              color: '#0b0f17',
+              color: 'var(--text-primary)',
               opacity: unoBusy ? 0.6 : 1,
             }}
             onClick={handleFlashUno}

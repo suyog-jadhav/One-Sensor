@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 287 101" width="287" height="101">
+  <defs>
+    <linearGradient id="ringGrad" x1="15%" y1="85%" x2="85%" y2="15%">
+      <stop offset="0%" stop-color="#304FFE" />
+      <stop offset="40%" stop-color="#0091FF" />
+      <stop offset="80%" stop-color="#00D2FF" />
+      <stop offset="100%" stop-color="#00E5FF" />
+    </linearGradient>
+    <linearGradient id="coreGrad" x1="20%" y1="80%" x2="80%" y2="20%">
+      <stop offset="0%" stop-color="#2979FF" />
+      <stop offset="100%" stop-color="#00D2FF" />
+    </linearGradient>
+  </defs>
+
+  <!-- Outer C-Ring -->
+  <path
+    d="M 67.04 57.86 A 21 21 0 1 1 67.04 38.14"
+    fill="none"
+    stroke="url(#ringGrad)"
+    stroke-width="10"
+    stroke-linecap="butt"
+  />
+
+  <!-- Inner Core Sensor Node -->
+  <circle cx="48.5" cy="48" r="8.5" fill="url(#coreGrad)" />
+
+  <!-- Horizontal Stem and Waveform -->
+  <path
+    d="M 57 48 L 74 48 C 75.8 48, 77.2 42.5, 79 42.5 C 81.2 42.5, 82.2 56, 84.5 56 C 86.8 56, 88.2 43.5, 90.5 43.5 C 92.5 43.5, 93.8 49, 96 49"
+    fill="none"
+    stroke="#00E5FF"
+    stroke-width="3"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+
+  <!-- Waveform Terminal Node and Droplet -->
+  <circle cx="98" cy="49" r="3" fill="#00E5FF" />
+  <circle cx="97.5" cy="54.5" r="1.5" fill="#00E5FF" />
+
+  <!-- Typography -->
+  <g fill="currentColor" font-family="'Inter', system-ui, -apple-system, sans-serif">
+    <text x="108" y="55" font-size="26" letter-spacing="-0.03em">
+      <tspan font-weight="700">One</tspan><tspan font-weight="400">Sensor</tspan>
+    </text>
+    <text x="109" y="72" font-size="8.5" font-weight="500" letter-spacing="0.18em" opacity="0.75">
+      VIRTUAL SENSOR WORKBENCH
+    </text>
+  </g>
+</svg>

@@ -1,0 +1,971 @@
+<USER_REQUEST>
+analyze current project and i have to modify ui don't go into the onesensor library part of cpp or c code i want to change the ui only so 
+
+# MASTER PROMPT: OneSensor — Complete UI/UX Redesign
+
+## 1. Role and objective
+
+Act as a senior product designer, UI/UX architect, frontend engineer, interaction designer, and design systems specialist.
+
+Completely redesign the existing **OneSensor — Virtual Sensor Workbench** into a polished, credible, professional IoT engineering application.
+
+This is a full application-wide redesign, not a cosmetic refresh. Improve the information architecture, layout, typography, component system, hardware visualization, charts, interaction patterns, responsive behavior, and animations across every existing page.
+
+The result must feel like a real engineering instrument used by embedded developers to configure, simulate, inspect, and test virtual sensors.
+
+**Do not create another generic AI-generated SaaS dashboard. Do not make the application look like a gaming HUD, cyberpunk control room, cryptocurrency terminal, or futuristic concept mockup.**
+
+The interface must be attractive because of its hierarchy, precision, consistency, useful data visualization, and interaction quality—not because of decorative effects.
+
+## 2. Mandatory first phase: inspect the complete repository
+
+Before writing code or changing the interface, inspect the existing project thoroughly.
+
+Identify:
+
+- Framework, build system, entry points, routing, and application structure.
+- Every page, route, modal, drawer, tab, form, and shared component.
+- Existing stylesheets, design tokens, icon libraries, fonts, chart libraries, animation libraries, and 3D rendering implementation.
+- State management, API clients, backend endpoints, WebSocket connections, serial communication, and hardware integration.
+- Sensor data models, channel identifiers, GPIO mappings, configuration persistence, scenario execution, fault injection, firmware flashing, and device setup logic.
+- Existing loading, disconnected, error, empty, simulated, and connected states.
+- All existing buttons, dropdowns, sliders, selectors, forms, navigation actions, keyboard shortcuts, and interactive 3D controls.
+
+Build a page/component inventory before implementation.
+
+Inspect the actual source code instead of assuming that values displayed in the screenshots correspond to implemented functionality. Treat screenshots as visual references, not as proof that a feature works.
+
+If an existing feature is incomplete, document its current state and preserve its intended behavior without inventing a working backend.
+
+Do not replace the application with a static mockup. Do not rewrite working backend or hardware logic merely to make the redesign easier.
+
+## 3. Product identity and visual direction
+
+Product name: OneSensor  
+Product description: Virtual Sensor Workbench  
+Product category: IoT development, virtual sensor simulation, hardware testing, and signal diagnostics.
+
+Use the design concept **Instrument Studio**.
+
+The application should combine the precision of professional engineering software with the clarity of a modern developer tool.
+
+### Visual principles
+
+1. Information hierarchy must be immediately obvious.
+2. Every element must have a functional purpose.
+3. Technical information must remain readable at normal desktop viewing distance.
+4. Related controls must be grouped together.
+5. Charts and hardware models must receive sufficient space.
+6. Empty space is intentional and must not be filled with decorative cards.
+7. Reuse a consistent design system throughout the application.
+8. Avoid visual novelty that makes familiar engineering tasks harder.
+
+### Color palette
+
+Use a restrained, coherent dark theme.
+
+- Main application background: approximately #111315.
+- Primary working surface: approximately #191C1F.
+- Elevated surface: approximately #202428.
+- Borders and separators: approximately #34393D.
+- Primary text: approximately #F1F0EA.
+- Secondary text: approximately #A6ACB1.
+- Muted text: approximately #777F86.
+- Primary action: warm amber, approximately #D7A84B.
+- Data visualization and active streams: muted teal, approximately #6FAFA7.
+- Actual success: restrained green.
+- Actual warnings: muted amber.
+- Actual errors and active faults: muted red.
+
+These values are starting points. Define centralized design tokens and use them consistently.
+
+Do not use every accent color simultaneously on every component. Assign meaning to each color and preserve that meaning throughout the application.
+
+Never use neon glow as the default treatment for borders, text, cards, buttons, charts, or status indicators.
+
+No excessive gradients, glassmorphism everywhere, glowing outlines, blurred decorative backgrounds, oversized ambient light effects, or unnecessary 3D decoration.
+
+### Typography
+
+Use the existing font setup if it is already appropriate. Otherwise, select a clean UI typeface such as Inter or Geist, with a suitable monospace typeface such as JetBrains Mono for technical values.
+
+Use:
+- Clear page titles.
+- Medium-weight section headings.
+- Readable labels.
+- Tabular numerals for changing sensor values.
+- Monospace for serial output, timestamps, pin identifiers, and raw technical data only.
+
+Avoid using tiny uppercase captions for every section. Uppercase labels should be reserved for genuinely useful technical metadata.
+
+Establish a consistent spacing scale based on 4px or 8px increments. Use a small, consistent radius scale. Prefer thin separators and layout alignment over nested borders.
+
+## 4. Global application shell
+
+Redesign the shared shell before individual pages.
+
+### Header
+
+Create a compact top bar containing:
+
+- OneSensor wordmark and a simple original product mark.
+- Current page breadcrumb or title.
+- Actual connection state.
+- Selected target/device when known.
+- A restrained primary action for running a demo or starting a relevant operation.
+- A keyboard shortcut hint only when the shortcut is implemented.
+
+Keep the header approximately 56–64px high on desktop.
+
+Do not repeat all status information in both the header and every page.
+
+### Sidebar
+
+Use a fixed, collapsible sidebar approximately 216–240px wide when expanded.
+
+Group navigation into:
+
+**Workbench**
+- Overview
+- Live Sensors
+- Scenarios
+- Fault Lab
+
+**Hardware**
+- Devices & 3D
+- Configuration
+- Firmware
+- Serial Console
+
+**System**
+- Device Setup
+
+Use one consistent icon library, preferably the existing library or Lucide if a library must be introduced.
+
+Each navigation item must have:
+- A clear label.
+- A recognizable icon.
+- A subtle active state.
+- A restrained hover state.
+- A visible keyboard focus state.
+
+The active state should use a muted surface and a small amber indicator, not a glowing outline.
+
+Use a smooth width transition when collapsing the sidebar. Tooltips should appear only when labels are hidden.
+
+### Main workspace
+
+Use a responsive content container with consistent horizontal spacing and aligned section edges.
+
+Avoid placing every content block inside another card. Use open layouts for page headings, thin dividers for section separation, and surfaces only where they establish useful grouping.
+
+At desktop widths, prioritize a productive engineering workspace over oversized hero sections.
+
+### Global footer/status strip
+
+Retain a compact bottom status strip only if it provides meaningful information.
+
+Display actual connection state, active sensor count, and telemetry rate when these values are available. Hide unavailable metrics or display a clearly identified unavailable state.
+
+Do not display fabricated uptime, packet loss, latency, connection status, firmware version, or hardware detection results.
+
+## 5. Page 1 — Overview
+
+Redesign the overview into a concise operational dashboard.
+
+### Top section
+
+Display:
+- Page title: Overview.
+- A short description of the current workbench state.
+- One primary action, such as Open Live Sensors or Run Demo.
+- A secondary action to configure hardware when appropriate.
+
+Avoid a large promotional hero card.
+
+### Summary strip
+
+Use no more than four primary summary metrics unless the real workflow requires more:
+
+- Hardware connection.
+- Configured/active sensor channels.
+- Telemetry rate.
+- Current session or simulation state.
+
+Each metric must have a meaningful value and a clear label.
+
+Differentiate configured channels from channels actually transmitting data.
+
+### Main workspace
+
+Use a balanced two-column layout.
+
+Left: an interactive 3D hardware preview showing the actual ESP32 board and selected sensor/component where available.
+
+Right: a compact system activity/diagnostics section showing real connection details, current issues, and useful recent events.
+
+Below: a sensor-channel table or compact channel list showing all 12 sensors with:
+- Sensor name.
+- Current value and unit.
+- Configured channel/pin when known.
+- Simulation or hardware status.
+- A small trend preview where real history is available.
+- A direct action to inspect or configure the channel.
+
+Do not give every channel an oversized decorative card.
+
+### Overview interactions
+
+- Clicking a channel opens its details in Live Sensors.
+- Clicking the 3D preview opens Devices & 3D.
+- Clicking a warning navigates to the relevant configuration, device setup, or diagnostics page.
+- Running a demo must use the actual available demo implementation and visibly communicate when the demo is simulated.
+
+Do not show a 96/100 diagnostic score, packet-loss percentage, latency, or 12/12 healthy status unless those values are calculated from real application data.
+
+## 6. Page 2 — Live Sensors
+
+This is the primary workspace and must receive particularly careful design attention.
+
+### Page layout
+
+At the top, display:
+- Live Sensors heading.
+- Actual connection/simulation status.
+- A compact sensor/channel selector.
+- Start, pause, or resume controls when supported.
+
+Use a compact horizontal channel strip or searchable selector for all 12 sensors. Avoid wrapping a large collection of decorative chips across multiple rows.
+
+### Selected sensor workspace
+
+Use a clear two-column layout.
+
+**Main area:**
+- Sensor name and description.
+- Large, readable current value with unit.
+- A real-time line chart when timestamped samples are available.
+- Min/max/current statistics for the selected time window when calculated from actual samples.
+- Sampling rate and last-update time when known.
+
+**Inspector area:**
+- Sensor configuration.
+- Minimum and maximum values.
+- Calibration offset and scale.
+- Channel assignment.
+- Applicable fault state.
+- Sensor-specific controls.
+
+Controls must be appropriate to the selected sensor.
+
+Examples:
+- Temperature: °C.
+- Humidity: %RH.
+- Gas: the configured unit, clearly defined.
+- Light: lux.
+- Soil moisture: %.
+- Motion X/Y/Z: acceleration with clearly identified units.
+- Proximity: cm.
+- Sound level: dB, with a clear indication if the value is simulated rather than acoustically calibrated.
+- UV: UV index.
+- CO₂/air quality: distinguish estimated CO₂ concentration from a generic air-quality signal.
+
+Do not imply that a virtual value is a calibrated physical measurement.
+
+### Sensor list
+
+Support all 12 configured sensors:
+1. Temperature.
+2. Humidity.
+3. Gas.
+4. Light.
+5. Soil Moisture.
+6. Motion X.
+7. Motion Y.
+8. Motion Z.
+9. Proximity.
+10. Sound Level.
+11. UV Index.
+12. CO₂ / Air Quality.
+
+Use concise sensor icons, consistent labels, and actual model/value metadata. Icons are secondary to readable text.
+
+### Sensor visualization
+
+Use genuine 3D hardware models wherever available. If a model is missing, show a purposeful placeholder illustration or a clean sensor schematic rather than a misleading generic object.
+
+Keep sensor-specific charts and controls consistent across channels.
+
+For Motion X/Y/Z, retain useful attitude or acceleration visualization, but treat it as a specialized motion panel rather than a large decorative centerpiece that dominates every sensor workflow.
+
+### Value controls
+
+Use accessible sliders and numeric inputs with:
+- Minimum and maximum values.
+- Visible current value.
+- Unit labels.
+- Keyboard support.
+- Validation.
+- Immediate feedback.
+
+Changing a virtual value must update the correct state and propagate through the existing supported data flow. Do not claim hardware output has changed if only local preview state changed.
+
+## 7. Page 3 — Scenarios
+
+Create a focused scenario builder that follows this workflow:
+
+**Choose sensor → Configure signal → Preview → Execute → Inspect results.**
+
+### Layout
+
+Use a two-column workspace.
+
+Left: signal configuration.
+
+Right: a larger waveform preview with a clear legend, axes, units, and statistics.
+
+Below the preview: a compact list of engineering presets.
+
+### Signal configuration
+
+Support the existing signal types:
+- Sine.
+- Square.
+- Triangle.
+- Ramp.
+
+Retain existing supported parameters:
+- Target sensor/channel.
+- Baseline/center offset.
+- Oscillation amplitude.
+- Frequency.
+- Session duration.
+
+Display units and valid ranges dynamically based on the selected sensor.
+
+### Waveform preview
+
+Use a real charting library already present in the project if suitable. Otherwise, use a well-supported lightweight chart library or an accessible custom SVG/canvas implementation.
+
+The chart must:
+- Use legible axes and units.
+- Use restrained gridlines.
+- Have a clear line and meaningful legend.
+- Animate the signal only when useful.
+- Respect the configured frequency, amplitude, and offset.
+- Show calculated min/max/mean only when derived from the generated signal.
+- Adapt to viewport resizing.
+
+Do not animate a decorative waveform unrelated to the configured values.
+
+### Presets
+
+Preserve the existing presets when implemented:
+- Room Temperature Cycle.
+- Gas Leak Rapid Spike.
+- Brightness Transition.
+- Soil Drying Cycle.
+- Inertial Motion Burst.
+
+Each preset should show a concise explanation, affected channel, and signal type.
+
+Running a preset must load its actual parameters and execute the existing scenario logic.
+
+### Execution states
+
+Provide clear idle, configuring, running, completed, paused, and failed states where supported.
+
+Show progress or elapsed time only when meaningful.
+
+Prevent duplicate execution when a scenario is already running. Confirm before interrupting a running scenario if that operation could discard work.
+
+## 8. Page 4 — Fault Lab
+
+Treat the Fault Lab as a serious signal-integrity testing instrument.
+
+### Layout
+
+Use a two-column layout.
+
+Left: fault configuration.
+
+Right: a large oscilloscope-style chart and event timeline.
+
+### Fault configuration
+
+Preserve all supported fault models:
+- Spike.
+- Noise.
+- Dropout.
+- Stuck value.
+- Drift.
+- Disconnect.
+- Latency.
+
+Use a compact radio/list selector instead of a collection of oversized buttons.
+
+For the selected fault, show only the parameters that apply, including:
+- Target channel.
+- Magnitude/deviation.
+- Duration.
+- Delay/latency when applicable.
+- Relevant baseline or recovery settings.
+
+Provide a prominent Inject Fault button and a separate recovery/reset action.
+
+### Oscilloscope
+
+Display:
+- Baseline signal.
+- Fault interval.
+- Observed affected signal.
+- Recovery interval when available.
+
+Use restrained visual annotations and a clear legend.
+
+The graph should explain what changed, when it changed, and whether the channel recovered.
+
+Do not show an active fault until the underlying fault state confirms that injection occurred.
+
+### Event timeline
+
+Record actual events with timestamps and severity.
+
+Distinguish informational events, warnings, and errors through restrained color and iconography.
+
+Support clearing or exporting logs if the existing architecture allows it.
+
+Fault injection must modify the actual simulation or data pipeline that already exists. Never simulate a successful injection only through a button animation.
+
+## 9. Page 5 — Devices & 3D
+
+Make this page a hardware inspection environment, not a decorative 3D showcase.
+
+### Layout
+
+Use a large 3D viewport on the left and a contextual inspector on the right.
+
+The viewport should occupy most of the useful working area without excessive empty padding.
+
+### 3D scene
+
+Use the existing Three.js or other current 3D engine if present.
+
+Load real GLB/glTF models from a documented asset directory.
+
+For the ESP32 model:
+- Show a recognizable board with the correct form factor.
+- Use accurate component positions when the model supports them.
+- Provide useful default camera framing.
+- Support orbit, zoom, and reset view.
+- Use restrained lighting and realistic materials.
+- Avoid excessive bloom, neon outlines, or floating decorative objects.
+
+For sensor models:
+- Show the actual selected module when a matching asset exists.
+- Keep model orientation and scale consistent.
+- Show a clear placeholder when no model is available.
+- Do not represent an unrelated model as a real sensor.
+
+### Pin inspection
+
+Make selectable pins or pin hotspots available when supported by the model and hardware mapping.
+
+On selection, display:
+- GPIO identifier.
+- Assigned channel.
+- Signal mode.
+- Valid electrical capabilities.
+- Current value or state when available.
+- Conflicts or restrictions.
+
+The pin inspector must use the same configuration source as the Configuration page.
+
+Do not hardcode visual pin assignments separately from the actual channel configuration.
+
+### Interactions
+
+- Clicking a pin selects it.
+- Selecting a channel highlights the associated pin when the mapping exists.
+- Changing a valid assignment updates the inspector.
+- Reset view restores the default camera.
+- Loading errors are shown as useful messages, not silently swallowed.
+
+Dispose of unused geometries, materials, textures, and event listeners when changing models.
+
+## 10. Page 6 — Configuration
+
+Redesign the configuration matrix as a professional technical data table.
+
+### Table columns
+
+Preserve applicable existing fields:
+- Enabled.
+- Sensor channel.
+- Signal type.
+- ESP32 pin routing.
+- Frequency.
+- Resolution/bits.
+- Minimum.
+- Maximum.
+- Calibration offset.
+- Calibration scale.
+
+Do not remove fields that are required by the existing backend.
+
+### Table behavior
+
+- Use a consistent dark/neutral table style.
+- Avoid browser-default white dropdowns and inputs.
+- Align numeric columns consistently.
+- Use compact inline editing.
+- Provide meaningful validation.
+- Show field-level errors.
+- Display pin conflicts immediately.
+- Disable unsupported choices rather than presenting them as valid.
+- Use keyboard-accessible controls.
+- Preserve unsaved-change state.
+- Provide explicit Save and Discard actions.
+- Show success only after the save operation succeeds.
+
+Allow the table to scroll horizontally on smaller screens without breaking the application shell.
+
+### Pin allocation map
+
+Retain a visual pin allocation map when it helps users understand the configuration.
+
+Use clear states for available, assigned, selected, conflicting, and unavailable pins.
+
+Clicking a pin should select the same pin in the configuration table and hardware inspector.
+
+### Electrical and firmware constraints
+
+Validate the configuration against the actual target hardware, supported signal modes, pin restrictions, and existing firmware.
+
+Do not assume that a virtual sensor value can be represented as an arbitrary electrical output on any GPIO.
+
+The classic ESP32's DAC capabilities, ADC inputs, PWM support, and other peripheral constraints must be represented correctly for the actual selected board.
+
+Do not label a signal as DAC, analog current, PWM, or a particular bus unless the implementation genuinely supports that mode.
+
+## 11. Page 7 — Firmware
+
+Redesign firmware operations as a guided, trustworthy workflow.
+
+### Layout
+
+Use a step-based process:
+
+1. Select target board.
+2. Detect/select serial port.
+3. Select firmware image.
+4. Review board and image compatibility.
+5. Flash.
+6. Verify and report the result.
+
+Preserve ESP32 and Arduino firmware flows if they exist in the codebase.
+
+### Firmware panel
+
+Show:
+- Board type.
+- Port.
+- Firmware filename.
+- File size when available.
+- Firmware version only when read from actual metadata.
+- Flash progress.
+- Verification state.
+
+Keep the primary flash action visible, but disable it when required prerequisites are missing.
+
+### Feedback
+
+Display actual progress, success, failure, and recovery instructions.
+
+If flashing is not implemented in the current environment, clearly indicate that the feature is unavailable rather than displaying fake progress or claiming that the firmware is verified.
+
+Do not expose a fake SHA-256 hash, fabricated binary size, invented toolchain status, or false read-back verification.
+
+## 12. Page 8 — Serial Console
+
+Design a functional developer console.
+
+### Layout
+
+Use clearly separated, resizable ESP32 and Arduino serial panes if both streams are supported.
+
+Each pane should have:
+- Port selection.
+- Baud-rate selection.
+- Connect/disconnect action.
+- Connection state.
+- Start/stop monitoring.
+- Clear.
+- Pause/resume.
+- Autoscroll.
+- Search or filtering.
+- Copy/export when supported.
+
+### Terminal design
+
+Use a readable monospace font, sensible line spacing, and a consistent terminal background.
+
+Colorize log levels only when the data supports those levels.
+
+Display timestamps and sequence identifiers only when available.
+
+Avoid a huge empty black rectangle with no guidance.
+
+When disconnected, show an actionable empty state explaining how to select a port and start monitoring.
+
+When connected but no data has arrived, distinguish that state from a disconnected device.
+
+Prevent repeated duplicate connection messages caused by unnecessary retry loops. Provide meaningful connection errors and retry controls.
+
+Do not invent incoming telemetry or serial messages.
+
+## 13. Page 9 — Device Setup
+
+Retain the existing five-stage setup workflow:
+
+1. Serial Port.
+2. Flash Firmware.
+3. Wi-Fi Setup.
+4. Network Link.
+5. Arduino Setup.
+
+### Layout
+
+Use a compact stepper on the left or across the top and a focused task area on the right.
+
+Each step must show:
+- What the user needs.
+- The current state.
+- The required inputs.
+- Validation feedback.
+- A clear next action.
+- A way to return to previous steps without losing valid inputs.
+
+### Setup behavior
+
+- Detect ports through the existing supported implementation.
+- Validate credentials without displaying secrets in logs.
+- Verify network connectivity only through actual supported checks.
+- Explain errors in plain language.
+- Keep completed steps visually distinct from pending or failed steps.
+- Do not mark a step complete just because the user clicked Next.
+
+Use a compact contextual help panel instead of a detached oversized hardware-tip card.
+
+## 14. Connection states and truthful telemetry
+
+This is a critical application-wide requirement.
+
+Use a centralized, consistent connection-state model.
+
+At minimum, distinguish:
+- Disconnected.
+- Connecting.
+- Connected.
+- Simulated/preview.
+- Error.
+
+Only show additional states such as reconnecting or degraded when the underlying implementation supports them.
+
+Do not allow the Overview, Live Sensors, Devices, Firmware, Serial Console, and Device Setup pages to display contradictory states.
+
+For example, a disconnected device must not simultaneously appear as verified hardware with live telemetry.
+
+All pages must derive their displayed status from the appropriate shared state or backend result rather than maintaining independent hardcoded status indicators.
+
+If a metric is unavailable, show an appropriate unavailable state or omit it.
+
+Clearly distinguish:
+- Configured channels.
+- Simulated sensor values.
+- Locally generated previews.
+- Data received from the ESP32.
+- Verified physical hardware operations.
+
+Never fabricate online status, latency, packet-loss statistics, uptime, diagnostic scores, serial port detection, firmware verification, or completed hardware operations.
+
+## 15. Motion and transition system
+
+Animations should clarify cause and effect. They must never distract from technical work.
+
+Use the existing animation library if suitable. Otherwise, prefer CSS transitions for simple interactions and introduce a motion library only if it is justified.
+
+### Global transitions
+
+- Sidebar collapse/expand: approximately 180–220ms.
+- Button hover and pressed states: approximately 120–160ms.
+- Dropdowns and popovers: approximately 140–180ms.
+- Tabs and active navigation: approximately 150–200ms.
+- Drawers and contextual inspectors: approximately 200–260ms.
+- Page content transitions: approximately 160–220ms.
+- Toast appearance/disappearance: approximately 180–220ms.
+
+Use a restrained ease-out curve for entrances and a natural ease-in/out curve for state changes.
+
+Avoid animating every element on page load.
+
+### Sensor values
+
+When a sensor value changes:
+- Update the displayed number immediately or with a very short transition.
+- Preserve tabular numeral alignment.
+- Avoid long count-up animations that make live readings misleading.
+- Use a subtle emphasis only when useful.
+- Never make a value appear stable while its actual state has changed.
+
+### Charts
+
+- Draw or reveal the initial series smoothly.
+- Append new samples as data arrives.
+- Keep axes stable when appropriate.
+- Avoid redrawing the entire page for each telemetry update.
+- Keep animation lightweight at higher sample rates.
+- Pause chart updates when the relevant stream is paused, if supported.
+
+### 3D
+
+- Use smooth orbit controls with damping.
+- Animate model replacement only when necessary.
+- Fade between sensor models briefly instead of using dramatic spins.
+- Keep camera reset predictable.
+- Do not rotate hardware automatically for decoration.
+
+### Fault injection
+
+When a fault is injected successfully:
+- Mark the injection time.
+- Annotate the chart.
+- Update the active fault state.
+- Add a timeline entry.
+- Show recovery when it actually occurs.
+
+Do not simulate a successful fault merely by flashing the screen red.
+
+### Accessibility
+
+Respect `prefers-reduced-motion`.
+
+All important information must remain available without animation. Provide visible focus indicators and accessible names for controls.
+
+## 16. Component architecture and design system
+
+Build reusable components instead of styling every page independently.
+
+Create or refine reusable equivalents of:
+
+- ApplicationShell.
+- SidebarNavigation.
+- TopBar.
+- ConnectionStatus.
+- PageHeader.
+- SectionHeader.
+- MetricSummary.
+- SensorChannelSelector.
+- SensorValueDisplay.
+- SensorInspector.
+- NumericInput.
+- RangeSlider.
+- DataChart.
+- WaveformChart.
+- EventTimeline.
+- FaultSelector.
+- HardwareViewport.
+- PinInspector.
+- ConfigurationTable.
+- ConnectionPanel.
+- SerialTerminal.
+- FirmwareWorkflow.
+- SetupStepper.
+- EmptyState.
+- ErrorState.
+- LoadingState.
+- Toast/notification.
+- ConfirmationDialog.
+
+Adapt component names to the existing codebase where practical.
+
+Use shared design tokens for colors, typography, spacing, radii, shadows, transitions, and z-index.
+
+Use consistent button sizes and variants:
+- Primary.
+- Secondary.
+- Ghost.
+- Destructive.
+
+Do not create a new component for every minor variation. Prefer configurable, reusable primitives.
+
+Keep page-specific business logic separate from presentation wherever the current architecture permits.
+
+## 17. Responsive design
+
+Desktop is the primary engineering workspace, but the interface must remain usable on smaller screens.
+
+### Large desktop
+
+- Full sidebar.
+- Spacious chart and 3D layouts.
+- Two-column inspectors.
+- Readable technical tables.
+
+### Laptop and tablet
+
+- Collapsible sidebar.
+- Reduced panel gaps.
+- Stacked inspectors where necessary.
+- Scrollable configuration table.
+- Usable chart controls.
+
+### Mobile
+
+- Compact navigation.
+- Stacked content.
+- Touch-friendly controls.
+- No horizontal page overflow.
+- Readable values and labels.
+- Usable forms and fault controls.
+
+Do not shrink the desktop layout until it becomes unreadable. Reorganize the layout at appropriate breakpoints.
+
+## 18. Performance and technical constraints
+
+- Preserve the current framework and build system unless a compelling technical reason requires change.
+- Reuse existing dependencies where possible.
+- Avoid introducing large libraries for trivial effects.
+- Lazy-load heavy 3D models and routes where appropriate.
+- Optimize GLB assets and textures.
+- Dispose of unused Three.js resources.
+- Avoid unnecessary rerenders during telemetry updates.
+- Keep high-frequency data updates separate from unrelated UI state.
+- Preserve working API contracts and WebSocket message formats.
+- Preserve serial communication and firmware interfaces.
+- Avoid storing secrets in client-visible logs or local persistence.
+- Handle loading, network errors, malformed telemetry, and missing model files gracefully.
+- Use accessible semantic HTML and keyboard-operable controls.
+
+## 19. Explicit anti-patterns: do not introduce
+
+Do not use:
+- Generic AI-generated dashboard templates.
+- Excessive card grids.
+- Multiple nested bordered panels.
+- Neon glow on everything.
+- Large decorative hero cards.
+- Random gradients or blurred orbs.
+- Excessive all-caps micro-labels.
+- Fake live charts.
+- Fake diagnostics or connection metrics.
+- Unnecessary badges for ordinary labels.
+- Arbitrary emoji as the primary icon system.
+- Generic illustrations that misrepresent actual hardware.
+- Decorative 3D objects without a functional purpose.
+- Excessive page-entry animations.
+- Arbitrary random sensor values presented as real readings.
+- Placeholder buttons that appear functional but do nothing.
+- Duplicate connection status indicators with conflicting values.
+- New features that are unrelated to the existing OneSensor scope.
+
+## 20. Implementation sequence
+
+Execute the redesign in this order.
+
+**Phase A — Audit**
+1. Inspect the complete repository.
+2. List routes, components, dependencies, state sources, and existing functionality.
+3. Identify incorrect or contradictory status sources.
+4. Identify missing assets and nonfunctional controls.
+5. Establish a safe implementation plan.
+
+**Phase B — Design foundation**
+1. Create design tokens.
+2. Standardize typography, spacing, controls, buttons, surfaces, and icons.
+3. Implement the global application shell.
+4. Establish connection and simulation status handling.
+
+**Phase C — Core workbench**
+1. Overview.
+2. Live Sensors.
+3. Scenarios.
+4. Fault Lab.
+
+**Phase D — Hardware and system tools**
+1. Devices & 3D.
+2. Configuration.
+3. Firmware.
+4. Serial Console.
+5. Device Setup.
+
+**Phase E — Motion and responsive polish**
+1. Add the defined transitions.
+2. Optimize charts and 3D interactions.
+3. Add accessible loading, empty, error, and success states.
+4. Verify reduced-motion behavior.
+5. Refine tablet and mobile layouts.
+
+**Phase F — Validation**
+1. Run the existing build and tests.
+2. Fix errors introduced by the redesign.
+3. Verify all navigation routes.
+4. Verify all 12 sensor channels.
+5. Verify sensor value changes and channel mappings.
+6. Verify scenario parameter updates and execution.
+7. Verify fault selection, injection, and recovery.
+8. Verify 3D loading, orbit, zoom, reset, and pin inspection.
+9. Verify configuration validation and persistence.
+10. Verify firmware and serial workflows to the extent supported by the actual environment.
+11. Verify setup-step validation.
+12. Check that disconnected and simulated states are accurate.
+13. Test responsive layouts and keyboard accessibility.
+14. Remove obsolete styling and unused dependencies introduced by the redesign.
+
+## 21. Definition of done
+
+The redesign is complete only when:
+
+- Every existing page has been redesigned consistently.
+- The application has one coherent visual identity.
+- The UI feels like professional engineering software rather than an AI-generated template.
+- The main tasks are easy to understand and operate.
+- All 12 sensor channels remain accessible.
+- Charts represent actual generated or received data.
+- Hardware and sensor models are accurately represented.
+- All status indicators are grounded in real application state.
+- Existing working functionality is preserved.
+- Interactive controls perform their advertised actions.
+- Transitions are restrained and responsive.
+- The application works at desktop, tablet, and mobile sizes.
+- The build succeeds and introduced errors are fixed.
+
+## 22. Final deliverables
+
+After implementation, provide:
+
+1. A concise summary of the redesign.
+2. The final route/page inventory.
+3. The shared component and design-token structure.
+4. The list of files changed.
+5. Any unresolved backend or hardware limitations.
+6. Build and test results.
+7. Screenshots of the redesigned Overview, Live Sensors, Scenarios, Fault Lab, and Devices & 3D pages.
+
+Do not stop after producing a plan or a static design. Inspect, implement, validate, and finish the actual application using the existing repository.
+
+**Final design principle: OneSensor should look like a carefully engineered instrument for working with virtual sensors—not a collection of futuristic dashboard widgets.**
+</USER_REQUEST>
+<ADDITIONAL_METADATA>
+The current local time is: 2026-10-17T10:01:23+05:30.
+
+The user's current state is as follows:
+Active Document: c:\blockchain\suyog\One-Sensor\desktop\frontend\vite.config.js (LANGUAGE_JAVASCRIPT)
+Cursor is on line: 1
+Other open documents:
+- c:\blockchain\suyog\One-Sensor\run.ps1 (LANGUAGE_POWERSHELL)
+- c:\blockchain\suyog\One-Sensor\desktop\frontend\vite.config.js (LANGUAGE_JAVASCRIPT)
+- c:\blockchain\suyog\One-Sensor\run.bat (LANGUAGE_UNSPECIFIED)
+Running terminal commands:
+- ./run.bat (in c:\blockchain\suyog\One-Sensor, running for 17m53s)
+</ADDITIONAL_METADATA>

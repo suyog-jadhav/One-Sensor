@@ -1,504 +1,706 @@
-import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
-import Badge from './Badge';
-import { useSmoothedValue } from '../utils/useSmoothedValue';
-import { RefreshCw, Wifi, AlertTriangle, Zap, RotateCcw } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  Thermometer,
+  Droplets,
+  Wind,
+  Sun,
+  Sprout,
+  Compass,
+  Radio,
+  Volume2,
+  SunMedium,
+  CloudFog,
+  Zap,
+  RotateCcw,
+  Activity,
+  Cpu,
+  Sliders,
+  CheckCircle,
+  AlertTriangle,
+  Layers,
+  Grid,
+  Maximize2
+} from 'lucide-react';
+import Sensor2DVisual from './Sensor2DVisual';
+import MotionAttitude2D from './MotionAttitude2D';
 
-const MotionGizmo3D = lazy(() => import('./MotionGizmo3D'));
-
-const SENSOR_META = [
-  { key: 'temperature',  name: 'Temperature',     unit: '°C',    icon: '🌡️',  min: 0,   max: 50,   step: 0.5,  color: '#ef4444', wsKey: 'temperature' },
-  { key: 'humidity',     name: 'Humidity',         unit: '%',     icon: '💧',  min: 0,   max: 100,  step: 0.5,  color: '#38bdf8', wsKey: 'humidity' },
-  { key: 'gas',         name: 'Gas',               unit: 'ppm',   icon: '☁️',  min: 0,   max: 1000, step: 5,    color: '#8b5cf6', wsKey: 'gas' },
-  { key: 'light',       name: 'Light',             unit: 'lux',   icon: '☀️',  min: 0,   max: 1000, step: 5,    color: '#f59e0b', wsKey: 'light' },
-  { key: 'soil',        name: 'Soil Moisture',     unit: '%',     icon: '🌱',  min: 0,   max: 100,  step: 0.5,  color: '#10b981', wsKey: 'soil_moisture' },
-  { key: 'motionX',     name: 'Motion X',          unit: 'g',     icon: '📐',  min: -2,  max: 2,    step: 0.01, color: '#f472b6', wsKey: 'motionX' },
-  { key: 'motionY',     name: 'Motion Y',          unit: 'g',     icon: '📐',  min: -2,  max: 2,    step: 0.01, color: '#a78bfa', wsKey: 'motionY' },
-  { key: 'motionZ',     name: 'Motion Z',          unit: 'g',     icon: '📐',  min: -2,  max: 2,    step: 0.01, color: '#818cf8', wsKey: 'motionZ' },
-  { key: 'proximity',   name: 'Proximity',         unit: 'cm',    icon: '📡',  min: 2,   max: 400,  step: 1,    color: '#fb923c', wsKey: 'proximity' },
-  { key: 'sound',       name: 'Sound Level',       unit: 'dB',    icon: '🔊',  min: 30,  max: 120,  step: 0.5,  color: '#34d399', wsKey: 'sound' },
-  { key: 'uv',          name: 'UV Index',          unit: 'idx',   icon: '🌞',  min: 0,   max: 11,   step: 0.1,  color: '#fbbf24', wsKey: 'uv' },
-  { key: 'co2',         name: 'CO₂ / Air Quality', unit: 'ppm',   icon: '🍃',  min: 400, max: 5000, step: 10,   color: '#6ee7b7', wsKey: 'co2' },
+export const SENSOR_META = [
+  {
+    key: 'temperature',
+    id: 'CH01',
+    name: 'Temperature',
+    desc: 'Ambient temperature measurement in degrees Celsius',
+    unit: '°C',
+    icon: Thermometer,
+    min: 0,
+    max: 50,
+    step: 0.5,
+    gpio: 'GPIO 34',
+    signal: 'ADC1 (Analog)',
+    resolution: '12-bit (0-4095)'
+  },
+  {
+    key: 'humidity',
+    id: 'CH02',
+    name: 'Humidity',
+    desc: 'Relative atmospheric moisture level percentage',
+    unit: '%RH',
+    icon: Droplets,
+    min: 0,
+    max: 100,
+    step: 0.5,
+    gpio: 'GPIO 35',
+    signal: 'ADC1 (Analog)',
+    resolution: '12-bit (0-4095)'
+  },
+  {
+    key: 'gas',
+    id: 'CH03',
+    name: 'Gas Concentration',
+    desc: 'MQ-2 metal oxide combustible gas & smoke detector',
+    unit: 'ppm',
+    icon: Wind,
+    min: 0,
+    max: 1000,
+    step: 5,
+    gpio: 'GPIO 32',
+    signal: 'ADC1 (Analog)',
+    resolution: '12-bit (0-4095)'
+  },
+  {
+    key: 'light',
+    id: 'CH04',
+    name: 'Ambient Light',
+    desc: 'Photoresistor illuminance level transducer',
+    unit: 'lux',
+    icon: Sun,
+    min: 0,
+    max: 2000,
+    step: 10,
+    gpio: 'GPIO 33',
+    signal: 'ADC1 (Analog)',
+    resolution: '12-bit (0-4095)'
+  },
+  {
+    key: 'soil',
+    id: 'CH05',
+    name: 'Soil Moisture',
+    desc: 'Capacitive soil water saturation matrix',
+    unit: '%',
+    icon: Sprout,
+    min: 0,
+    max: 100,
+    step: 0.5,
+    gpio: 'GPIO 25',
+    signal: 'DAC1 (Analog Out)',
+    resolution: '8-bit DAC (0-255)'
+  },
+  {
+    key: 'proximity',
+    id: 'CH06',
+    name: 'Proximity Distance',
+    desc: 'Ultrasonic echo flight-time distance capture',
+    unit: 'cm',
+    icon: Radio,
+    min: 2,
+    max: 400,
+    step: 1,
+    gpio: 'GPIO 26',
+    signal: 'DAC2 / PWM',
+    resolution: '8-bit DAC (0-255)'
+  },
+  {
+    key: 'sound',
+    id: 'CH07',
+    name: 'Sound Level',
+    desc: 'Electret microphone peak audio decibel amplitude',
+    unit: 'dB',
+    icon: Volume2,
+    min: 30,
+    max: 120,
+    step: 1,
+    gpio: 'GPIO 27',
+    signal: 'ADC2 (Analog)',
+    resolution: '12-bit (0-4095)'
+  },
+  {
+    key: 'uv',
+    id: 'CH08',
+    name: 'UV Index',
+    desc: 'Solar ultraviolet radiation radiometer',
+    unit: 'UVI',
+    icon: SunMedium,
+    min: 0,
+    max: 12,
+    step: 0.1,
+    gpio: 'GPIO 14',
+    signal: 'ADC2 (Analog)',
+    resolution: '12-bit (0-4095)'
+  },
+  {
+    key: 'co2',
+    id: 'CH09',
+    name: 'CO₂ Air Quality',
+    desc: 'Indoor air quality carbon dioxide ppm monitor',
+    unit: 'ppm',
+    icon: CloudFog,
+    min: 400,
+    max: 5000,
+    step: 10,
+    gpio: 'GPIO 12',
+    signal: 'ADC2 (Analog)',
+    resolution: '12-bit (0-4095)'
+  },
+  {
+    key: 'motionX',
+    id: 'CH10',
+    name: 'Motion X Axis',
+    desc: '6-axis inertial motion lateral acceleration',
+    unit: 'g',
+    icon: Compass,
+    min: -2,
+    max: 2,
+    step: 0.05,
+    gpio: 'GPIO 21 (I2C SDA)',
+    signal: 'I2C Bus (0x68)',
+    resolution: '16-bit Gyro/Acc'
+  },
+  {
+    key: 'motionY',
+    id: 'CH11',
+    name: 'Motion Y Axis',
+    desc: '6-axis inertial motion longitudinal acceleration',
+    unit: 'g',
+    icon: Compass,
+    min: -2,
+    max: 2,
+    step: 0.05,
+    gpio: 'GPIO 21 (I2C SDA)',
+    signal: 'I2C Bus (0x68)',
+    resolution: '16-bit Gyro/Acc'
+  },
+  {
+    key: 'motionZ',
+    id: 'CH12',
+    name: 'Motion Z Axis',
+    desc: '6-axis inertial motion vertical gravitational acceleration',
+    unit: 'g',
+    icon: Compass,
+    min: -2,
+    max: 2,
+    step: 0.05,
+    gpio: 'GPIO 22 (I2C SCL)',
+    signal: 'I2C Bus (0x68)',
+    resolution: '16-bit Gyro/Acc'
+  },
 ];
 
-const FAULT_TYPES = ['none', 'dropout', 'stuck', 'noise', 'spike', 'drift', 'disconnect', 'latency'];
+export default function LiveControl({
+  state,
+  onSetValue,
+  onSetMotion,
+  onInjectFault,
+  onClearFault,
+  onConnectESP32
+}) {
+  const [selectedKey, setSelectedKey] = useState('temperature');
+  const [viewMode, setViewMode] = useState('focused'); // 'focused' | 'grid'
 
-const API_BASE = 'http://127.0.0.1:8000';
+  // Fault form state for inspector
+  const [faultType, setFaultType] = useState('spike');
+  const [faultMag, setFaultMag] = useState(15);
+  const [faultDur, setFaultDur] = useState(3000);
 
-// ─── Individual Sensor Card ────────────────────────────────────────────────────
-function LiveSensorCard({ sensor, rawVal, isConnected, onSetValue, activeFault }) {
-  const numVal = rawVal !== undefined ? Number(rawVal) : ((sensor.min + sensor.max) / 2);
-  const smoothedVal = useSmoothedValue(numVal, { duration: 260, decimals: sensor.step < 0.1 ? 3 : 1, isActive: true });
-  const [pulseActive, setPulseActive] = useState(false);
-  const prevValRef = useRef(numVal);
+  // Time-series history buffer for the selected sensor
+  const historyRef = useRef([]);
+  const canvasRef = useRef(null);
 
+  const selectedSensor = SENSOR_META.find(s => s.key === selectedKey) || SENSOR_META[0];
+  const currentVal = state[selectedKey] !== undefined ? Number(state[selectedKey]) : ((selectedSensor.min + selectedSensor.max) / 2);
+  const activeFault = state.faults && state.faults[selectedKey];
+
+  // Update history buffer
   useEffect(() => {
-    if (Math.abs(prevValRef.current - numVal) > 0.05) {
-      setPulseActive(true);
-      const t = setTimeout(() => setPulseActive(false), 200);
-      prevValRef.current = numVal;
-      return () => clearTimeout(t);
+    historyRef.current.push(currentVal);
+    if (historyRef.current.length > 100) {
+      historyRef.current.shift();
     }
-  }, [numVal]);
+  }, [currentVal, selectedKey]);
 
-  const hasFault = activeFault && activeFault !== 'none';
-
-  return (
-    <div
-      className="sensor-card interactive-card"
-      style={{
-        opacity: isConnected ? 1 : 0.75,
-        border: hasFault
-          ? '1px solid rgba(239,68,68,0.5)'
-          : pulseActive
-          ? `1px solid ${sensor.color}`
-          : '1px solid var(--border-color)',
-        transition: 'border-color var(--motion-fast), opacity var(--motion-standard)',
-        position: 'relative',
-        overflow: 'hidden',
-      }}
-    >
-      {hasFault && (
-        <div style={{
-          position: 'absolute', top: 0, left: 0, right: 0, height: '2px',
-          background: 'linear-gradient(90deg, #ef4444, #f59e0b)',
-          animation: 'shimmer 1.5s linear infinite',
-        }} />
-      )}
-      <div className="card-top">
-        <span className="sensor-name">{sensor.name}</span>
-        <span style={{ fontSize: '20px' }}>{sensor.icon}</span>
-      </div>
-
-      <div
-        className="sensor-value-large"
-        style={{
-          color: hasFault ? '#f59e0b' : sensor.color,
-          transform: pulseActive ? 'scale(1.02)' : 'scale(1)',
-          transition: 'transform var(--motion-instant)',
-        }}
-      >
-        {rawVal !== undefined ? smoothedVal.toFixed(sensor.step < 0.1 ? 3 : 1) : '--'}{' '}
-        <span className="unit">{sensor.unit}</span>
-      </div>
-
-      {hasFault && (
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: '5px',
-          fontSize: '10px', fontFamily: 'var(--font-mono)',
-          color: '#f59e0b', marginBottom: '6px',
-        }}>
-          <AlertTriangle size={10} />
-          <span>FAULT: {activeFault.toUpperCase()}</span>
-        </div>
-      )}
-
-      <div className="slider-container">
-        <input
-          type="range"
-          min={sensor.min}
-          max={sensor.max}
-          step={sensor.step}
-          value={numVal}
-          disabled={!isConnected}
-          onChange={(e) => onSetValue(sensor.wsKey, parseFloat(e.target.value))}
-          title={isConnected ? '' : 'Connect to ESP32 first'}
-          style={{ cursor: isConnected ? 'pointer' : 'not-allowed' }}
-        />
-      </div>
-
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px', fontSize: '11px', color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>
-        <span>MIN: {sensor.min}</span>
-        <span>MAX: {sensor.max} {sensor.unit}</span>
-      </div>
-    </div>
-  );
-}
-
-// ─── Fault Injection Panel ────────────────────────────────────────────────────
-function FaultInjectionPanel({ onInjectFault, onClearFault }) {
-  const [selectedSensor, setSelectedSensor] = useState('temperature');
-  const [faultType, setFaultType] = useState('noise');
-  const [magnitude, setMagnitude] = useState(5);
-  const [durationMs, setDurationMs] = useState(0);
-  const [latencyMs, setLatencyMs] = useState(200);
-  const [lastInjected, setLastInjected] = useState(null);
-
-  const handleInject = () => {
-    onInjectFault(selectedSensor, faultType, magnitude, durationMs, latencyMs);
-    setLastInjected({ sensor: selectedSensor, type: faultType });
-    setTimeout(() => setLastInjected(null), 2500);
-  };
-
-  return (
-    <div
-      className="interactive-card"
-      style={{
-        background: 'rgba(239,68,68,0.04)',
-        border: '1px solid rgba(239,68,68,0.2)',
-        borderRadius: 'var(--radius-lg)',
-        padding: '20px 24px',
-      }}
-    >
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '18px' }}>
-        <Zap size={16} color="#ef4444" />
-        <h3 style={{ fontSize: '14px', fontWeight: '700', color: '#ef4444', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-          Fault Injection Engine
-        </h3>
-        <Badge variant="danger" size="sm">LIVE</Badge>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '14px', marginBottom: '16px' }}>
-        {/* Sensor selector */}
-        <div>
-          <label style={{ fontSize: '11px', color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', display: 'block', marginBottom: '6px' }}>TARGET SENSOR</label>
-          <select
-            value={selectedSensor}
-            onChange={e => setSelectedSensor(e.target.value)}
-            style={{
-              width: '100%', padding: '7px 10px', borderRadius: 'var(--radius-sm)',
-              background: 'var(--bg-surface-3)', border: '1px solid var(--border-color)',
-              color: 'var(--text-main)', fontFamily: 'var(--font-mono)', fontSize: '12px',
-            }}
-          >
-            {SENSOR_META.map(s => <option key={s.wsKey} value={s.wsKey}>{s.name}</option>)}
-          </select>
-        </div>
-
-        {/* Fault type */}
-        <div>
-          <label style={{ fontSize: '11px', color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', display: 'block', marginBottom: '6px' }}>FAULT TYPE</label>
-          <select
-            value={faultType}
-            onChange={e => setFaultType(e.target.value)}
-            style={{
-              width: '100%', padding: '7px 10px', borderRadius: 'var(--radius-sm)',
-              background: 'var(--bg-surface-3)', border: '1px solid var(--border-color)',
-              color: 'var(--text-main)', fontFamily: 'var(--font-mono)', fontSize: '12px',
-            }}
-          >
-            {FAULT_TYPES.filter(f => f !== 'none').map(f => (
-              <option key={f} value={f}>{f.toUpperCase()}</option>
-            ))}
-          </select>
-        </div>
-
-        {/* Magnitude */}
-        <div>
-          <label style={{ fontSize: '11px', color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', display: 'block', marginBottom: '6px' }}>
-            MAGNITUDE: <span style={{ color: 'var(--text-main)' }}>{magnitude}</span>
-          </label>
-          <input
-            type="range" min={0} max={500} step={1}
-            value={magnitude}
-            onChange={e => setMagnitude(Number(e.target.value))}
-          />
-        </div>
-
-        {/* Duration */}
-        <div>
-          <label style={{ fontSize: '11px', color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', display: 'block', marginBottom: '6px' }}>
-            DURATION: <span style={{ color: 'var(--text-main)' }}>{durationMs === 0 ? '∞' : `${durationMs}ms`}</span>
-          </label>
-          <input
-            type="range" min={0} max={10000} step={500}
-            value={durationMs}
-            onChange={e => setDurationMs(Number(e.target.value))}
-          />
-        </div>
-
-        {/* Latency (only relevant for latency fault) */}
-        {faultType === 'latency' && (
-          <div>
-            <label style={{ fontSize: '11px', color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', display: 'block', marginBottom: '6px' }}>
-              LATENCY: <span style={{ color: 'var(--text-main)' }}>{latencyMs}ms</span>
-            </label>
-            <input
-              type="range" min={0} max={2000} step={50}
-              value={latencyMs}
-              onChange={e => setLatencyMs(Number(e.target.value))}
-            />
-          </div>
-        )}
-      </div>
-
-      {lastInjected && (
-        <div className="banner-enter" style={{
-          padding: '8px 14px', marginBottom: '12px', borderRadius: 'var(--radius-sm)',
-          background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)',
-          fontSize: '12px', fontFamily: 'var(--font-mono)', color: '#fca5a5',
-        }}>
-          ✓ Fault [{lastInjected.type.toUpperCase()}] armed on {lastInjected.sensor}
-        </div>
-      )}
-
-      <div style={{ display: 'flex', gap: '10px' }}>
-        <button className="btn-primary" onClick={handleInject}
-          style={{ background: 'rgba(239,68,68,0.2)', borderColor: 'rgba(239,68,68,0.5)', color: '#fca5a5' }}
-        >
-          <Zap size={14} />
-          <span>Inject Fault</span>
-        </button>
-        <button className="btn-secondary" onClick={() => onClearFault(selectedSensor)}>
-          <RotateCcw size={14} />
-          <span>Clear Sensor</span>
-        </button>
-        <button className="btn-secondary" onClick={() => onClearFault('all')}>
-          <RotateCcw size={14} />
-          <span>Clear ALL</span>
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// ─── Main LiveControl Component ───────────────────────────────────────────────
-export default function LiveControl({ state, onSetValue, onSetMotion, onInjectFault, onClearFault, onConnectESP32 }) {
-  const [targetIP, setTargetIP] = useState('');
-  const [connecting, setConnecting] = useState(false);
-  const [esp32Connected, setEsp32Connected] = useState(false);
-  const [esp32IP, setEsp32IP] = useState(null);
-  const [activeFilter, setActiveFilter] = useState(
-    Object.fromEntries(SENSOR_META.map(s => [s.key, true]))
-  );
-  const [latency, setLatency] = useState(14);
-  const [isFlickering, setIsFlickering] = useState(false);
-  const [showFaultPanel, setShowFaultPanel] = useState(false);
-  const pollRef = useRef(null);
-
-  // Poll /api/esp32_status every 3s
+  // Clear history on sensor switch
   useEffect(() => {
-    const fetchStatus = async () => {
-      try {
-        const start = performance.now();
-        const res = await fetch(`${API_BASE}/api/esp32_status`);
-        const data = await res.json();
-        const roundTrip = Math.round(performance.now() - start);
-        setIsFlickering(true);
-        setTimeout(() => setIsFlickering(false), 80);
-        setLatency(roundTrip > 0 ? roundTrip : 12);
-        setEsp32Connected(data.connected);
-        if (data.ip) { setEsp32IP(data.ip); setTargetIP(prev => prev || data.ip); }
-      } catch (_) {}
-    };
-    fetchStatus();
-    pollRef.current = setInterval(fetchStatus, 3000);
-    return () => clearInterval(pollRef.current);
-  }, []);
+    historyRef.current = [currentVal];
+  }, [selectedKey]);
 
-  const handleConnect = async () => {
-    if (!targetIP) return;
-    setConnecting(true);
-    const res = await onConnectESP32(targetIP);
-    setConnecting(false);
-    if (res && res.success) { setEsp32Connected(true); setEsp32IP(targetIP); }
-  };
+  // Draw real-time canvas chart
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width;
+    const h = canvas.height;
 
-  const toggleSensorFilter = (key) => {
-    setActiveFilter(prev => ({ ...prev, [key]: !prev[key] }));
-  };
+    // Light-grey plotting surface matching slate engineering tokens
+    ctx.fillStyle = '#F4F7FA';
+    ctx.fillRect(0, 0, w, h);
 
-  const visibleSensors = SENSOR_META.filter(s => activeFilter[s.key]);
-  const faults = state.faults || {};
+    // Subtle grid lines
+    ctx.strokeStyle = '#DCE4EC';
+    ctx.lineWidth = 1;
+    for (let x = 0; x < w; x += 40) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, h);
+      ctx.stroke();
+    }
+    for (let y = 0; y < h; y += 30) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(w, y);
+      ctx.stroke();
+    }
+
+    const hist = historyRef.current;
+    if (hist.length < 2) return;
+
+    const min = selectedSensor.min;
+    const max = selectedSensor.max;
+    const range = (max - min) || 1;
+
+    // Translucent gradient fill under telemetry curve
+    const grad = ctx.createLinearGradient(0, 0, 0, h);
+    if (activeFault) {
+      grad.addColorStop(0, 'rgba(220, 69, 69, 0.20)');
+      grad.addColorStop(1, 'rgba(220, 69, 69, 0.0)');
+    } else {
+      grad.addColorStop(0, 'rgba(6, 182, 212, 0.22)');
+      grad.addColorStop(1, 'rgba(6, 182, 212, 0.0)');
+    }
+
+    ctx.beginPath();
+    for (let i = 0; i < hist.length; i++) {
+      const x = (i / (hist.length - 1 || 1)) * (w - 20) + 10;
+      const normalized = Math.max(0, Math.min(1, (hist[i] - min) / range));
+      const y = h - 15 - normalized * (h - 30);
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.lineTo(w - 10, h - 5);
+    ctx.lineTo(10, h - 5);
+    ctx.closePath();
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    // Vibrant Telemetry Cyan (#06B6D4) or Error Red (#DC4545)
+    ctx.beginPath();
+    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = activeFault ? '#DC4545' : '#06B6D4';
+
+    for (let i = 0; i < hist.length; i++) {
+      const x = (i / (hist.length - 1 || 1)) * (w - 20) + 10;
+      const normalized = Math.max(0, Math.min(1, (hist[i] - min) / range));
+      const y = h - 15 - normalized * (h - 30);
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+
+    // Latest value point with soft glowing halo
+    const lastX = w - 10;
+    const lastNorm = Math.max(0, Math.min(1, (currentVal - min) / range));
+    const lastY = h - 15 - lastNorm * (h - 30);
+
+    ctx.beginPath();
+    ctx.arc(lastX, lastY, 6, 0, Math.PI * 2);
+    ctx.fillStyle = activeFault ? 'rgba(220, 69, 69, 0.25)' : 'rgba(6, 182, 212, 0.25)';
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(lastX, lastY, 3.5, 0, Math.PI * 2);
+    ctx.fillStyle = activeFault ? '#DC4545' : '#06B6D4';
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(lastX, lastY, 1.5, 0, Math.PI * 2);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fill();
+  }, [currentVal, selectedKey, activeFault, selectedSensor]);
+
+  // Calculate actual statistics from buffer
+  const hist = historyRef.current;
+  const statMin = hist.length > 0 ? Math.min(...hist) : currentVal;
+  const statMax = hist.length > 0 ? Math.max(...hist) : currentVal;
+  const statAvg = hist.length > 0 ? (hist.reduce((a, b) => a + b, 0) / hist.length) : currentVal;
+
+  const isMotion = selectedKey === 'motionX' || selectedKey === 'motionY' || selectedKey === 'motionZ';
 
   return (
-    <div className="tab-content-enter" style={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>
-
-      {/* Top Banner */}
-      <div
-        className="interactive-card"
-        style={{
-          background: 'var(--bg-surface-2)',
-          border: '1px solid var(--border-color)',
-          borderRadius: 'var(--radius-lg)',
-          padding: '20px 24px',
-          backdropFilter: 'blur(16px)',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: '16px',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <div
-            style={{
-              width: '46px', height: '46px', borderRadius: '12px',
-              background: esp32Connected ? 'rgba(16,185,129,0.15)' : 'rgba(245,158,11,0.15)',
-              border: `1px solid ${esp32Connected ? 'rgba(16,185,129,0.35)' : 'rgba(245,158,11,0.35)'}`,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: '22px', transition: 'all var(--motion-fast)',
-            }}
-          >{esp32Connected ? '⚡' : '🔬'}</div>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
-              <h2 style={{ fontSize: '18px', fontWeight: '700' }}>Live Transducer Control</h2>
-              <Badge variant={esp32Connected ? 'success' : 'warning'} dot pulse={esp32Connected}>
-                {esp32Connected ? 'HARDWARE LINKED' : 'SIMULATED LAB STATE'}
-              </Badge>
-            </div>
-            <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-              12-channel real-time synthesis — direct hardware parameter modulation
-              {esp32IP && <span style={{ fontFamily: 'var(--font-mono)', marginLeft: '8px', color: 'var(--text-main)', opacity: 0.85 }}>[{esp32IP}]</span>}
-            </p>
-          </div>
+    <div className="page-container">
+      {/* ── Top Header Row ── */}
+      <div className="page-header-row">
+        <div>
+          <h1 className="page-title">Live Sensor Workbench</h1>
+          <p className="page-subtitle">
+            Real-time transducer synthesis, signal modulation, calibration adjustments, and fault testing.
+          </p>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: '8px',
-            background: 'rgba(0,0,0,0.3)', padding: '6px 12px',
-            borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)',
-          }}>
-            <span style={{ fontSize: '12px', color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>TARGET:</span>
-            <input
-              type="text"
-              placeholder="10.x.x.x or onesensor.local"
-              style={{ background: 'transparent', border: 'none', color: '#fff', fontSize: '13px', fontFamily: 'var(--font-mono)', width: '180px', outline: 'none' }}
-              value={targetIP}
-              onChange={e => setTargetIP(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleConnect()}
-            />
+        <div className="page-actions-group">
+          {/* View Mode Toggle */}
+          <div className="view-mode-toggle">
+            <button
+              className={`toggle-option ${viewMode === 'focused' ? 'active' : ''}`}
+              onClick={() => setViewMode('focused')}
+              title="Focused single-channel inspector"
+            >
+              <Maximize2 size={13} />
+              <span>Focused Channel</span>
+            </button>
+            <button
+              className={`toggle-option ${viewMode === 'grid' ? 'active' : ''}`}
+              onClick={() => setViewMode('grid')}
+              title="All 12 channels matrix"
+            >
+              <Grid size={13} />
+              <span>All 12 Channels</span>
+            </button>
           </div>
-          <button className="btn-primary" onClick={handleConnect} disabled={connecting} style={{ minWidth: '120px' }}>
-            {connecting ? (<><RefreshCw size={14} className="spin-icon" /><span>Linking…</span></>) :
-             esp32Connected ? (<><RefreshCw size={14} /><span>Reconnect</span></>) :
-             (<><Wifi size={14} /><span>Connect</span></>)}
-          </button>
-          <button
-            className="btn-secondary"
-            onClick={() => setShowFaultPanel(p => !p)}
-            style={{ borderColor: showFaultPanel ? 'rgba(239,68,68,0.5)' : undefined }}
-          >
-            <Zap size={14} />
-            <span>{showFaultPanel ? 'Hide Faults' : 'Fault Engine'}</span>
-          </button>
         </div>
       </div>
 
-      {/* Disconnected warning */}
-      {!esp32Connected && (
-        <div className="banner-enter" style={{
-          background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.3)',
-          borderRadius: 'var(--radius-md)', padding: '12px 18px',
-          fontSize: '13px', color: '#fcd34d',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <span style={{ fontSize: '18px' }}>⚠️</span>
-            <div>
-              <strong>ESP32 hardware not linked.</strong> Controls are operating in local preview loop.
-              {esp32IP && <span> Last endpoint: <code style={{ fontFamily: 'var(--font-mono)' }}>{esp32IP}</code></span>}
-            </div>
-          </div>
-          <Badge variant="warning" size="sm">PREVIEW</Badge>
-        </div>
-      )}
+      {/* ── Compact Horizontal Channel Strip (All 12 Sensors) (§6) ── */}
+      <div className="channel-strip-scroller" role="tablist" aria-label="Sensor Channels">
+        {SENSOR_META.map((s) => {
+          const isSelected = selectedKey === s.key;
+          const val = state[s.key] !== undefined ? Number(state[s.key]) : ((s.min + s.max) / 2);
+          const isFault = state.faults && state.faults[s.key];
+          const Icon = s.icon;
+          const formattedVal = val.toFixed(s.unit === 'g' || s.unit === 'UVI' ? 2 : 1);
 
-      {/* Fault Injection Panel (collapsible) */}
-      {showFaultPanel && (
-        <FaultInjectionPanel onInjectFault={onInjectFault} onClearFault={onClearFault} />
-      )}
-
-      {/* Channel Filter Pills */}
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        background: 'var(--bg-surface-1)', border: '1px solid var(--border-color)',
-        padding: '12px 18px', borderRadius: 'var(--radius-md)', flexWrap: 'wrap', gap: '12px',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-            Active Channels:
-          </span>
-          {SENSOR_META.map(s => {
-            const isActive = activeFilter[s.key];
-            return (
-              <button key={s.key} type="button" onClick={() => toggleSensorFilter(s.key)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: '6px',
-                  padding: '5px 10px', borderRadius: 'var(--radius-full)',
-                  background: isActive ? 'rgba(37,99,235,0.2)' : 'rgba(255,255,255,0.04)',
-                  border: isActive ? '1px solid var(--color-primary)' : '1px solid var(--border-color)',
-                  color: isActive ? '#fff' : 'var(--text-dim)',
-                  fontSize: '11px', fontWeight: '600', cursor: 'pointer',
-                  userSelect: 'none', transition: 'all var(--motion-fast)',
-                }}
-              >
-                <span>{s.icon}</span>
-                <span>{s.name}</span>
-                {isActive && <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: 'var(--color-primary)' }} />}
-              </button>
-            );
-          })}
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--color-cyan)' }}>
-          <span className="badge-dot-pulse" style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: 'var(--color-cyan)', boxShadow: '0 0 8px var(--color-cyan)', display: 'inline-block' }} />
-          <span>SYNTHESIS: 250 HZ</span>
-        </div>
+          return (
+            <button
+              key={s.key}
+              role="tab"
+              aria-selected={isSelected}
+              className={`channel-strip-chip ${isSelected ? 'active' : ''} ${isFault ? 'fault' : ''}`}
+              onClick={() => setSelectedKey(s.key)}
+            >
+              <span className="chip-header">
+                <span className="chip-id">{s.id}</span>
+                {isFault && <span className="chip-fault-dot" title="Active Fault" />}
+              </span>
+              <div className="chip-title-row">
+                <Icon size={12} className="chip-icon" />
+                <span className="chip-name">{s.name}</span>
+              </div>
+              <div className="chip-value-row">
+                <span className="chip-val">{formattedVal}</span>
+                <span className="chip-unit">{s.unit}</span>
+              </div>
+            </button>
+          );
+        })}
       </div>
 
-      {/* 3D Motion Gizmo (shown when any motion axis is active) */}
-      {(activeFilter.motionX || activeFilter.motionY || activeFilter.motionZ) && (
-        <Suspense fallback={
-          <div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-dim)', background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-color)' }}>
-            Loading 3D Gyroscope…
-          </div>
-        }>
-          <MotionGizmo3D
-            accelX={state.motionX ?? 0}
-            accelY={state.motionY ?? 0}
-            accelZ={state.motionZ ?? 1}
-            onSetMotion={onSetMotion}
-          />
-        </Suspense>
-      )}
+      {/* ── Mode 1: Focused Channel Workspace (§6) ── */}
+      {viewMode === 'focused' ? (
+        <div className="focused-sensor-grid">
+          {/* Left Column: Primary Instrument & Real-time Chart */}
+          <div className="panel-card live-readout-panel" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div className="panel-header">
+              <div className="panel-title">
+                <selectedSensor.icon size={16} color="var(--accent-amber)" />
+                <span>{selectedSensor.name} — Signal Stream & Modulation</span>
+              </div>
+              <span className="telemetry-chip">
+                <span>{selectedSensor.gpio}</span>
+              </span>
+            </div>
 
-      {/* Cards Grid */}
-      {visibleSensors.length === 0 ? (
-        <div style={{
-          padding: '40px', textAlign: 'center', color: 'var(--text-muted)',
-          background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-color)',
-        }}>
-          No transducer channels selected. Enable one or more channels above.
+            {/* Readout Block */}
+            <div className="focused-readout-card">
+              <div className="readout-left">
+                <span className="readout-desc">{selectedSensor.desc}</span>
+                <div className="readout-figures">
+                  <span className="readout-number">
+                    {currentVal.toFixed(selectedSensor.unit === 'g' || selectedSensor.unit === 'UVI' ? 2 : 1)}
+                  </span>
+                  <span className="readout-unit">{selectedSensor.unit}</span>
+                </div>
+              </div>
+
+              {/* Statistics calculated from buffer */}
+              <div className="readout-stats-grid">
+                <div className="stat-box">
+                  <span className="stat-title">BUFFER MIN</span>
+                  <span className="stat-num">{statMin.toFixed(1)} {selectedSensor.unit}</span>
+                </div>
+                <div className="stat-box">
+                  <span className="stat-title">BUFFER MAX</span>
+                  <span className="stat-num">{statMax.toFixed(1)} {selectedSensor.unit}</span>
+                </div>
+                <div className="stat-box">
+                  <span className="stat-title">BUFFER AVG</span>
+                  <span className="stat-num">{statAvg.toFixed(1)} {selectedSensor.unit}</span>
+                </div>
+                <div className="stat-box">
+                  <span className="stat-title">STATUS</span>
+                  <span className="stat-num" style={{ color: activeFault ? 'var(--color-danger)' : 'var(--color-success)' }}>
+                    {activeFault ? 'FAULT ACTIVE' : 'NOMINAL'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Real-time Oscilloscope Chart */}
+            <div className="focused-chart-wrapper">
+              <div className="chart-header-row">
+                <span className="chart-label">REAL-TIME SIGNAL TELEMETRY BUFFER (100 SAMPLES)</span>
+                <span className="chart-range">{selectedSensor.min} to {selectedSensor.max} {selectedSensor.unit}</span>
+              </div>
+              <canvas
+                ref={canvasRef}
+                width={640}
+                height={160}
+                className="focused-chart-canvas"
+              />
+            </div>
+
+            {/* Interactive Value Modulation Slider */}
+            <div className="control-slider-pod">
+              <div className="slider-label-row">
+                <span className="slider-label">TRANSDUCER SIGNAL MODULATION</span>
+                <div className="slider-val-input-wrap">
+                  <input
+                    type="number"
+                    min={selectedSensor.min}
+                    max={selectedSensor.max}
+                    step={selectedSensor.step}
+                    value={currentVal}
+                    onChange={(e) => onSetValue(selectedKey, Number(e.target.value))}
+                    className="slider-num-input"
+                  />
+                  <span className="slider-num-unit">{selectedSensor.unit}</span>
+                </div>
+              </div>
+
+              <input
+                type="range"
+                min={selectedSensor.min}
+                max={selectedSensor.max}
+                step={selectedSensor.step}
+                value={currentVal}
+                onChange={(e) => onSetValue(selectedKey, Number(e.target.value))}
+                className="instrument-range-slider"
+              />
+
+              <div className="slider-limits-row">
+                <span>{selectedSensor.min} {selectedSensor.unit}</span>
+                <span>Range span: {selectedSensor.max - selectedSensor.min} {selectedSensor.unit}</span>
+                <span>{selectedSensor.max} {selectedSensor.unit}</span>
+              </div>
+            </div>
+
+            {/* Sensor Visual: Specialized Motion panel for Motion axes, or 2D Visual */}
+            {isMotion ? (
+              <div className="motion-embedded-pod">
+                <div className="panel-header" style={{ marginBottom: '8px' }}>
+                  <div className="panel-title" style={{ fontSize: '12px' }}>
+                    <Compass size={13} color="var(--accent-teal)" />
+                    <span>6-Axis IMU Spatial Inclinometer (Attitude)</span>
+                  </div>
+                </div>
+                <MotionAttitude2D
+                  accelX={state.motionX ?? 0}
+                  accelY={state.motionY ?? 0}
+                  accelZ={state.motionZ ?? 1}
+                  onSetMotion={onSetMotion}
+                />
+              </div>
+            ) : (
+              <div className="sensor-2d-embedded">
+                <Sensor2DVisual
+                  sensorKey={selectedKey}
+                  value={currentVal}
+                  unit={selectedSensor.unit}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Right Column: Electrical Inspector & Channel Fault Controller */}
+          <div className="panel-card live-readout-panel" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div className="panel-header">
+              <div className="panel-title">
+                <Layers size={14} color="var(--accent-teal)" />
+                <span>Electrical & Channel Inspector</span>
+              </div>
+              <span className="status-badge-nominal">{selectedSensor.id}</span>
+            </div>
+
+            {/* Spec breakdown */}
+            <div className="spec-table-list">
+              <div className="spec-table-row">
+                <span className="spec-label">Hardware Routing:</span>
+                <span className="spec-value mono accent">{selectedSensor.gpio}</span>
+              </div>
+              <div className="spec-table-row">
+                <span className="spec-label">Modulation Mode:</span>
+                <span className="spec-value mono">{selectedSensor.signal}</span>
+              </div>
+              <div className="spec-table-row">
+                <span className="spec-label">Internal Resolution:</span>
+                <span className="spec-value mono teal">{selectedSensor.resolution}</span>
+              </div>
+              <div className="spec-table-row">
+                <span className="spec-label">Transducer Range:</span>
+                <span className="spec-value mono">{selectedSensor.min} — {selectedSensor.max} {selectedSensor.unit}</span>
+              </div>
+              <div className="spec-table-row">
+                <span className="spec-label">Resolution Step:</span>
+                <span className="spec-value mono green">±{selectedSensor.step} {selectedSensor.unit}</span>
+              </div>
+            </div>
+
+            {/* Channel Fault Injection Module */}
+            <div className="channel-fault-card">
+              <div className="fault-card-header">
+                <Zap size={14} color="var(--color-danger)" />
+                <span className="fault-card-title">Signal Integrity & Fault Injection</span>
+              </div>
+
+              <div className="fault-form-group">
+                <label className="fault-form-label">FAULT MODEL</label>
+                <select
+                  value={faultType}
+                  onChange={(e) => setFaultType(e.target.value)}
+                  className="fault-select-input"
+                >
+                  <option value="spike">Spike (Transient Excursion)</option>
+                  <option value="noise">Noise (Gaussian Jitter)</option>
+                  <option value="dropout">Dropout (Zero Signal Loss)</option>
+                  <option value="stuck">Stuck (ADC Saturation Pin)</option>
+                  <option value="drift">Drift (Linear Bias Accumulation)</option>
+                  <option value="disconnect">Disconnect (Open Circuit)</option>
+                  <option value="latency">Latency (Buffer Replay Lag)</option>
+                </select>
+              </div>
+
+              <div className="fault-form-group">
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                  <label className="fault-form-label" style={{ margin: 0 }}>MAGNITUDE / DEVIATION</label>
+                  <span className="fault-form-val">±{faultMag} {selectedSensor.unit}</span>
+                </div>
+                <input
+                  type="range"
+                  min={1}
+                  max={Math.max(10, (selectedSensor.max - selectedSensor.min) * 0.5)}
+                  value={faultMag}
+                  onChange={(e) => setFaultMag(Number(e.target.value))}
+                  className="instrument-range-slider"
+                />
+              </div>
+
+              <div className="fault-form-group">
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                  <label className="fault-form-label" style={{ margin: 0 }}>FAULT DURATION</label>
+                  <span className="fault-form-val">{faultDur === 0 ? 'Indefinite' : `${faultDur} ms`}</span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={10000}
+                  step={500}
+                  value={faultDur}
+                  onChange={(e) => setFaultDur(Number(e.target.value))}
+                  className="instrument-range-slider"
+                />
+              </div>
+
+              {activeFault && (
+                <div className="active-fault-callout">
+                  <AlertTriangle size={13} color="var(--color-danger)" />
+                  <span>Fault armed: [{activeFault.type || 'ACTIVE'}]</span>
+                </div>
+              )}
+
+              <div className="fault-btn-group">
+                <button
+                  className="btn-danger-outline"
+                  onClick={() => onInjectFault(selectedKey, faultType, faultMag, faultDur)}
+                >
+                  <Zap size={13} />
+                  <span>Inject Fault</span>
+                </button>
+                <button
+                  className="btn-secondary"
+                  onClick={() => onClearFault(selectedKey)}
+                >
+                  <RotateCcw size={13} />
+                  <span>Clear</span>
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       ) : (
-        <div className="cards-grid">
-          {visibleSensors.map(s => {
-            const rawVal = state[s.key] !== undefined ? state[s.key] : undefined;
-            const activeFault = faults[s.wsKey]?.type;
+        /* ── Mode 2: All 12 Channels Grid Matrix (§6) ── */
+        <div className="all-channels-grid">
+          {SENSOR_META.map((s) => {
+            const val = state[s.key] !== undefined ? Number(state[s.key]) : ((s.min + s.max) / 2);
+            const isFault = state.faults && state.faults[s.key];
+            const Icon = s.icon;
+            const displayVal = val.toFixed(s.unit === 'g' || s.unit === 'UVI' ? 2 : 1);
+
             return (
-              <LiveSensorCard
+              <div
                 key={s.key}
-                sensor={s}
-                rawVal={rawVal}
-                isConnected={esp32Connected}
-                onSetValue={onSetValue}
-                activeFault={activeFault}
-              />
+                className={`all-channel-card ${isFault ? 'fault' : ''} ${selectedKey === s.key ? 'selected' : ''}`}
+                onClick={() => {
+                  setSelectedKey(s.key);
+                  setViewMode('focused');
+                }}
+              >
+                <div className="card-top-row">
+                  <div className="card-id-badge">{s.id}</div>
+                  <span className="card-gpio">{s.gpio}</span>
+                </div>
+
+                <div className="card-name-row">
+                  <Icon size={14} color="var(--accent-amber)" />
+                  <span className="card-sensor-name">{s.name}</span>
+                </div>
+
+                <div className="card-figure-row">
+                  <span className="card-val">{displayVal}</span>
+                  <span className="card-unit">{s.unit}</span>
+                </div>
+
+                <div className="card-slider-wrap" onClick={(e) => e.stopPropagation()}>
+                  <input
+                    type="range"
+                    min={s.min}
+                    max={s.max}
+                    step={s.step}
+                    value={val}
+                    onChange={(e) => onSetValue(s.key, Number(e.target.value))}
+                    className="instrument-range-slider"
+                  />
+                </div>
+
+                <div className="card-footer-row">
+                  <span className="card-signal-type">{s.signal}</span>
+                  {isFault ? (
+                    <span className="card-fault-tag">FAULT</span>
+                  ) : (
+                    <span className="card-nominal-tag">NOMINAL</span>
+                  )}
+                </div>
+              </div>
             );
           })}
         </div>
       )}
-
-      {/* Bottom diagnostics bar */}
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '10px 16px', background: 'var(--bg-surface-1)',
-        border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)',
-        fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-dim)',
-        flexWrap: 'wrap', gap: '12px',
-      }}>
-        <div style={{ display: 'flex', gap: '20px' }}>
-          <span>INSTRUMENTS: <strong style={{ color: 'var(--text-muted)' }}>{visibleSensors.length} / 12 ONLINE</strong></span>
-          <span>FRAME-SYNC: <strong style={{ color: 'var(--color-success)' }}>4.0 HZ LOCKED</strong></span>
-          <span>LATENCY:{' '}
-            <strong style={{ color: 'var(--color-cyan)', opacity: isFlickering ? 0.4 : 1, transition: 'opacity var(--motion-instant)' }}>
-              {latency} MS
-            </strong>
-          </span>
-        </div>
-        <div><span>ESP32 12-CH DAC/PWM BRIDGE ENGINE v2.0</span></div>
-      </div>
-
     </div>
   );
 }

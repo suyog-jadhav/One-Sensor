@@ -1,7 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import Badge from './Badge';
 import { useSmoothedValue } from '../utils/useSmoothedValue';
-import { Check, AlertTriangle, RefreshCw, Cpu, Wifi, Eye, EyeOff, ShieldCheck, ChevronRight } from 'lucide-react';
+import {
+  Check,
+  AlertTriangle,
+  RefreshCw,
+  Cpu,
+  Wifi,
+  Eye,
+  EyeOff,
+  ShieldCheck,
+  ChevronRight,
+  Zap,
+  Terminal,
+  Radio,
+  Globe
+} from 'lucide-react';
 
 const WIZARD_STEPS = [
   { id: 1, title: 'Serial Port', desc: 'Select ESP32 USB COM' },
@@ -116,7 +130,7 @@ export default function SetupWizard({
     setErrorMsg('');
 
     if (wifiMethod === 'build') {
-      setStatusStage('📝 Compiling Wi-Fi credentials into firmware…');
+      setStatusStage('Compiling Wi-Fi credentials into firmware…');
       setStatusMsg('');
       const res = await onBuildFlashESP32(selectedPortESP, ssid, password, deviceName);
       setLoading(false);
@@ -125,7 +139,7 @@ export default function SetupWizard({
       if (res.success) {
         const ip = res.ip || null;
         setConnectedIP(ip || '');
-        setStatusMsg(`✅ Connected! ESP32 acquired IP: ${ip || 'onesensor.local'}`);
+        setStatusMsg(`Connected! ESP32 acquired IP: ${ip || 'onesensor.local'}`);
         setStep(4);
       } else {
         const stageLabel = { write_secrets: 'Write credentials', build: 'Compile firmware', flash: 'Flash ESP32' }[res.stage] || res.stage;
@@ -191,9 +205,8 @@ export default function SetupWizard({
 
         {/* Stepper Card */}
         <div
-          className="interactive-card"
+          className="interactive-card wizard-stepper-card"
           style={{
-            background: 'var(--bg-card)',
             border: '1px solid var(--border-color)',
             borderRadius: 'var(--radius-lg)',
             padding: '20px 16px',
@@ -312,9 +325,8 @@ export default function SetupWizard({
 
         {/* Hardware Tip Card */}
         <div
-          className="interactive-card"
+          className="interactive-card wizard-tip-card"
           style={{
-            background: 'var(--bg-surface-1)',
             border: '1px solid var(--border-color)',
             borderRadius: 'var(--radius-md)',
             padding: '16px',
@@ -333,9 +345,8 @@ export default function SetupWizard({
 
       {/* ── Right Content Area: Active Step View ── */}
       <div
-        className="interactive-card"
+        className="interactive-card wizard-content-card"
         style={{
-          background: 'var(--bg-card)',
           border: '1px solid var(--border-color)',
           borderRadius: 'var(--radius-lg)',
           padding: '32px',
@@ -351,7 +362,7 @@ export default function SetupWizard({
             style={{
               background: 'rgba(239, 68, 68, 0.12)',
               border: '1px solid rgba(239, 68, 68, 0.35)',
-              color: '#fca5a5',
+              color: 'var(--color-danger, #DC4545)',
               padding: '12px 16px',
               borderRadius: 'var(--radius-md)',
               marginBottom: '20px',
@@ -375,7 +386,7 @@ export default function SetupWizard({
             style={{
               background: 'rgba(37, 99, 235, 0.12)',
               border: '1px solid rgba(37, 99, 235, 0.35)',
-              color: '#93c5fd',
+              color: 'var(--accent-primary, #4263EB)',
               padding: '12px 16px',
               borderRadius: 'var(--radius-md)',
               marginBottom: '20px',
@@ -498,13 +509,16 @@ export default function SetupWizard({
                   borderRadius: 'var(--radius-sm)',
                   border: `2px solid ${wifiMethod === 'build' ? 'var(--color-primary)' : 'var(--border-color)'}`,
                   background: wifiMethod === 'build' ? 'rgba(37,99,235,0.15)' : 'rgba(0,0,0,0.2)',
-                  color: wifiMethod === 'build' ? '#93c5fd' : 'var(--text-dim)',
+                  color: wifiMethod === 'build' ? 'var(--accent-primary, #4263EB)' : 'var(--text-dim)',
                   cursor: 'pointer',
                   textAlign: 'left',
                   transition: 'all var(--motion-fast)',
                 }}
               >
-                <div style={{ fontWeight: '700', fontSize: '13px' }}>⚡ Build & Flash</div>
+                <div style={{ fontWeight: '700', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Zap size={14} color="var(--color-primary)" />
+                  <span>Build & Flash</span>
+                </div>
                 <div style={{ fontSize: '11px', opacity: 0.8 }}>Embeds credentials into firmware image. Most reliable.</div>
               </button>
 
@@ -517,13 +531,16 @@ export default function SetupWizard({
                   borderRadius: 'var(--radius-sm)',
                   border: `2px solid ${wifiMethod === 'serial' ? 'var(--color-primary)' : 'var(--border-color)'}`,
                   background: wifiMethod === 'serial' ? 'rgba(37,99,235,0.15)' : 'rgba(0,0,0,0.2)',
-                  color: wifiMethod === 'serial' ? '#93c5fd' : 'var(--text-dim)',
+                  color: wifiMethod === 'serial' ? 'var(--accent-primary, #4263EB)' : 'var(--text-dim)',
                   cursor: 'pointer',
                   textAlign: 'left',
                   transition: 'all var(--motion-fast)',
                 }}
               >
-                <div style={{ fontWeight: '700', fontSize: '13px' }}>🔌 USB Serial</div>
+                <div style={{ fontWeight: '700', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Terminal size={14} color="var(--color-primary)" />
+                  <span>USB Serial</span>
+                </div>
                 <div style={{ fontSize: '11px', opacity: 0.8 }}>Transmits over serial line. Fast ~15s.</div>
               </button>
             </div>
@@ -616,14 +633,17 @@ export default function SetupWizard({
                 fontSize: '13px',
               }}
             >
-              <div className="terminal-line" style={{ animationDelay: '0.1s' }}>
-                🌐 <strong>IP ADDRESS:</strong> {connectedIP || '10.102.133.78'}
+              <div className="terminal-line" style={{ animationDelay: '0.1s', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Globe size={14} color="var(--color-success)" />
+                <span><strong>IP ADDRESS:</strong> {connectedIP || '10.102.133.78'}</span>
               </div>
-              <div className="terminal-line" style={{ animationDelay: '0.2s' }}>
-                📡 <strong>mDNS HOSTNAME:</strong> {deviceName}.local
+              <div className="terminal-line" style={{ animationDelay: '0.2s', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Radio size={14} color="var(--color-success)" />
+                <span><strong>mDNS HOSTNAME:</strong> {deviceName}.local</span>
               </div>
-              <div className="terminal-line" style={{ animationDelay: '0.3s' }}>
-                🔌 <strong>WEBSOCKET URI:</strong> ws://{connectedIP || `${deviceName}.local`}/ws
+              <div className="terminal-line" style={{ animationDelay: '0.3s', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Zap size={14} color="var(--color-success)" />
+                <span><strong>WEBSOCKET URI:</strong> ws://{connectedIP || `${deviceName}.local`}/ws</span>
               </div>
             </div>
 

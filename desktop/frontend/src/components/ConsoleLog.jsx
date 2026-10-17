@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Badge from './Badge';
-import { RefreshCw, Play, Square, Trash2, Filter, Terminal, Activity } from 'lucide-react';
+import { RefreshCw, Play, Square, Trash2, Filter, Terminal, Activity, Cpu } from 'lucide-react';
 
 const BAUDRATES = [9600, 19200, 38400, 57600, 115200, 230400, 460800];
 const CATEGORY_FILTERS = ['ALL', 'IPC', 'WEBSOCKET', 'TELEMETRY', 'SYSTEM'];
@@ -76,13 +76,12 @@ function SerialPanel({
 
   return (
     <div
-      className="interactive-card"
+      className="interactive-card console-controls-card"
       style={{
         flex: 1,
         display: 'flex',
         flexDirection: 'column',
         gap: '12px',
-        background: 'var(--bg-card)',
         border: `1px solid ${isMonitoring ? accentColor + '66' : 'var(--border-color)'}`,
         borderRadius: 'var(--radius-lg)',
         padding: '20px',
@@ -93,7 +92,7 @@ function SerialPanel({
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <span style={{ fontSize: '20px' }}>{icon}</span>
+          <div style={{ display: 'flex', alignItems: 'center' }}>{icon}</div>
           <div>
             <h3 style={{ fontSize: '15px', fontWeight: '700' }}>{title}</h3>
             <span style={{ fontSize: '11px', color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>
@@ -185,9 +184,9 @@ function SerialPanel({
             fontSize: '12px',
             fontWeight: '600',
             cursor: 'pointer',
-            border: 'none',
-            background: isMonitoring ? 'rgba(239, 68, 68, 0.2)' : accentColor,
-            color: isMonitoring ? '#fca5a5' : '#0b0f17',
+            background: isMonitoring ? 'rgba(220, 69, 69, 0.12)' : 'var(--accent-primary, #4263EB)',
+            color: isMonitoring ? 'var(--color-danger, #DC4545)' : '#FFFFFF',
+            border: isMonitoring ? '1px solid rgba(220, 69, 69, 0.3)' : '1px solid var(--accent-primary, #4263EB)',
             display: 'flex',
             alignItems: 'center',
             gap: '6px',
@@ -336,7 +335,7 @@ export default function ConsoleLog({ logs, ports, onStartSerialMonitor, onStopSe
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: '20px' }}>
         <SerialPanel
           title="ESP32 Serial Stream"
-          icon="🔷"
+          icon={<Cpu size={18} color="var(--color-primary)" />}
           accentColor="var(--color-primary)"
           device="esp32"
           logs={esp32Logs}
@@ -347,7 +346,7 @@ export default function ConsoleLog({ logs, ports, onStartSerialMonitor, onStopSe
         />
         <SerialPanel
           title="Arduino Serial Stream"
-          icon="🟠"
+          icon={<Activity size={18} color="var(--color-cyan)" />}
           accentColor="var(--color-cyan)"
           device="arduino"
           logs={arduinoLogs}
