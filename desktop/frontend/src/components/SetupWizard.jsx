@@ -77,13 +77,17 @@ export default function SetupWizard({
 
   useEffect(() => {
     if (ports && ports.length > 0) {
-      const espCandidate = ports.find(p => p.is_esp32_candidate);
-      if (espCandidate) setSelectedPortESP(espCandidate.device);
-      else if (!selectedPortESP) setSelectedPortESP(ports[0].device);
+      setSelectedPortESP(prev => {
+        if (prev && ports.some(p => p.device === prev)) return prev;
+        const espCandidate = ports.find(p => p.is_esp32_candidate);
+        return espCandidate ? espCandidate.device : ports[0].device;
+      });
 
-      const unoCandidate = ports.find(p => p.is_arduino_candidate);
-      if (unoCandidate) setSelectedPortUno(unoCandidate.device);
-      else if (!selectedPortUno) setSelectedPortUno(ports[0].device);
+      setSelectedPortUno(prev => {
+        if (prev && ports.some(p => p.device === prev)) return prev;
+        const unoCandidate = ports.find(p => p.is_arduino_candidate);
+        return unoCandidate ? unoCandidate.device : ports[0].device;
+      });
     }
   }, [ports]);
 
