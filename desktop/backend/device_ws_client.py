@@ -69,7 +69,7 @@ class DeviceWSClient:
                     self.ws = websocket
                     self._connected = True
                     delay = INITIAL_DELAY   # reset backoff on successful connect
-                    print(f"[DeviceWSClient] ✅ Connected to ESP32 at {ws_url}")
+                    print(f"[DeviceWSClient] [OK] Connected to ESP32 at {ws_url}")
 
                     # Fetch config on connect
                     await self.send({"type": "get_config"})
@@ -95,7 +95,7 @@ class DeviceWSClient:
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                print(f"[DeviceWSClient] ❌ Connection lost: {e}. Retrying in {delay}s...")
+                print(f"[DeviceWSClient] [ERR] Connection lost: {e}. Retrying in {delay}s...")
             finally:
                 if self.task is None or self.task is current_task:
                     self.ws = None

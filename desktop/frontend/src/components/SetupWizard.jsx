@@ -35,6 +35,7 @@ const ARDUINO_CHANNELS = [
 
 export default function SetupWizard({
   ports,
+  onRefreshPorts,
   onFlashESP32,
   onProvisionESP32,
   onBuildFlashESP32,
@@ -410,27 +411,68 @@ export default function SetupWizard({
             </div>
 
             <div>
-              <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px', fontFamily: 'var(--font-mono)' }}>
-                AVAILABLE SERIAL PORTS
-              </label>
-              <select
-                style={{
-                  width: '100%',
-                  padding: '10px 14px',
-                  background: 'rgba(0,0,0,0.35)',
-                  border: '1px solid var(--border-color)',
-                  color: '#fff',
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                <label style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+                  AVAILABLE SERIAL PORTS
+                </label>
+                {onRefreshPorts && (
+                  <button
+                    type="button"
+                    onClick={onRefreshPorts}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      fontSize: '11px',
+                      color: 'var(--color-primary)',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontFamily: 'var(--font-mono)',
+                      fontWeight: 600
+                    }}
+                  >
+                    <RefreshCw size={12} /> Scan Ports
+                  </button>
+                )}
+              </div>
+              {(!ports || ports.length === 0) ? (
+                <div style={{
+                  padding: '12px 14px',
                   borderRadius: 'var(--radius-sm)',
-                  fontSize: '13px',
-                  fontFamily: 'var(--font-mono)',
-                }}
-                value={selectedPortESP}
-                onChange={e => setSelectedPortESP(e.target.value)}
-              >
-                {ports.map(p => (
-                  <option key={p.device} value={p.device}>{p.device} ({p.hint})</option>
-                ))}
-              </select>
+                  background: 'rgba(239, 68, 68, 0.08)',
+                  border: '1px solid rgba(239, 68, 68, 0.25)',
+                  fontSize: '12px',
+                  color: 'var(--color-danger)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}>
+                  <AlertTriangle size={15} />
+                  <span>No COM ports detected. Ensure ESP32 is plugged in via USB and the backend sidecar is running.</span>
+                </div>
+              ) : (
+                <select
+                  style={{
+                    width: '100%',
+                    padding: '10px 14px',
+                    background: 'rgba(0,0,0,0.35)',
+                    border: '1px solid var(--border-color)',
+                    color: '#fff',
+                    borderRadius: 'var(--radius-sm)',
+                    fontSize: '13px',
+                    fontFamily: 'var(--font-mono)',
+                  }}
+                  value={selectedPortESP}
+                  onChange={e => setSelectedPortESP(e.target.value)}
+                >
+                  {ports.map(p => (
+                    <option key={p.device} value={p.device}>
+                      {p.device} - {p.description || p.hint} {p.is_esp32_candidate ? ' [ESP32 Candidate]' : ''}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
 
             <button

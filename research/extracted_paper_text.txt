@@ -1,0 +1,689 @@
+--- PAGE 1 ---
+OneSensor: An ESP32-Based Intelligent Virtual
+Multi-Sensor Platform for Cost-Effective IoT Development
+and Testing
+Mahesh A vhad Suyog Jadhav Parshwa Nikam
+Department of Computer Department of Computer Department of Computer
+Engineering Engineering Engineering
+Pimpri Chinchwad College of Pimpri Chinchwad College of Pimpri Chinchwad College of
+Engineering Pune Engineering Pune Engineering Pune
+City, India City, India City, India
+mahesh.avhad24@pccoepune.org suyog.jadhav24@pccoepune.org parshwa.nikam24@pccoepune.org
+Abstract – IoT development and testing often require multiple
+physical sensors, which increases hardware cost, wiring com-
+plexity, configuration effort, and maintenance requirements.
+Testing an IoT application under different environmental con-
+ditions or sensor failure situations is also difficult because such
+conditions are not always safe or easy to reproduce. This pa-
+per presents OneSensor, an ESP32-based virtual multi-sensor
+platform designed to provide configurable sensor inputs for
+IoT development and testing. The proposed system uses an
+ESP32 as a virtual sensor device capable of generating values
+representing sensors such as temperature, humidity, gas, light,
+and soil moisture, and the current prototype extends this set to
+twelve concurrently addressable channels. These values can
+be provided to an external device such as an Arduino UNO,
+which acts as the system under test. A web-based dashboard
+allows the user to configure virtual sensors, assign sensors to
+output channels, select environmental scenarios, and introduce
+controlled sensor faults. The proposed approach enables re-
+peatable testing without requiring a separate physical sensor
+for every development stage. The platform also provides a
+foundation for future machine-learning-based sensor models,
+protocol-level sensor emulation, and automated testing. One-
+Sensor therefore aims to provide a low-cost and reusable plat-
+form for controlled IoT experimentation and Hardware-in-the-
+Loop testing.
+Index Terms – fault injection, IoT testing, sensor emula-
+tion, sensor virtualization, virtual sensors, hardware-in-the-
+loop testing
+1. Introduction
+The Internet of Things has become an important technol-
+ogy for applications including smart homes, agriculture, indus-
+trial monitoring, environmental monitoring, healthcare, and au-
+tomation. These applications depend heavily on sensor data
+to observe physical conditions and make decisions. During
+the development of such systems, developers generally require
+several physical sensors to reproduce the inputs expected by
+the application. This increases the overall cost of prototyping
+and introduces additional wiring, calibration, power, and main-
+tenance requirements.
+Another important challenge is testing an IoT application
+under different environmental and abnormal conditions. A de-
+veloper may need to determine how an application behaves
+when temperature increases rapidly, gas concentration rises,
+soil moisture decreases, communication is interrupted, or a
+sensor produces incorrect values. Reproducing these condi-
+tions using physical sensors can be difficult, unsafe, and incon-
+sistent. Furthermore, repeatedly testing the same failure condi-
+tion may require manually changing the physical environment
+or disconnecting hardware components.
+Virtual sensing and sensor virtualization have been investi-
+gated to reduce the dependence on direct physical sensing re-
+sources. Yuriyama and Kushida proposed a Sensor-Cloud In-
+frastructure in which physical sensors could be represented and
+managed through virtual sensor objects [1]. Perera et al. in-
+troduced CA4IOT to provide context-aware configuration and
+processing of sensor information according to user require-
+ments [2]. Their work demonstrates how higher-level context
+can be used to simplify interaction with large numbers of sen-
+sors.
+Perera et al. later proposed a Mobile Sensor Hub that sup-
+ported dynamic configuration of heterogeneous sensors and
+communication between sensor devices and middleware [3].
+Bose and Mukherjee proposed SensIaaS, extending the con-
+cept of sensor virtualization into a sensor-cloud infrastructure
+[4]. Chatterjee et al. developed a Big-Sensor-Cloud Infrastruc-
+ture for provisioning sensing resources as a service [5]. More
+recently, Zaidan et al. investigated virtual sensors for high-
+resolution air-pollution monitoring using artificial intelligence
+and IoT [6]. Complementary to the cloud-oriented virtual-
+sensor literature, a separate body of work on Hardware-in-the-
+Loop (HIL) simulation has studied how to electrically emulate
+sensors and actuators so that an embedded controller under test
+perceives a physically realistic signal rather than a purely soft-
+ware value [7, 8], and a further line of research studies how
+faults can be deliberately injected into such emulated signals
+or into the target system itself to evaluate reliability and fail-
+safe behavior [9, 10, 11].
+
+--- PAGE 2 ---
+Although these studies establish important concepts related
+to virtual sensors, context awareness, dynamic configuration,
+and intelligent sensing, the proposed OneSensor system fo-
+cuses on a different application. Instead of primarily managing
+physical sensors through cloud infrastructure or estimating an
+unavailable physical measurement, OneSensor uses an embed-
+ded ESP32 device to generate controllable virtual sensor inputs
+for another IoT device. The ESP32 acts as the virtual sensing
+platform, while an Arduino UNO or another controller can act
+as the system under test.
+The proposed platform combines virtual sensor generation,
+configurable sensor-to-channel mapping, environmental sce-
+nario simulation, fault injection, and browser-based control.
+This combination allows developers to test IoT applications
+under controlled conditions without requiring all correspond-
+ing physical sensors during the early stages of development.
+Compared with the initial concept, the current prototype addi-
+tionally realizes the virtual-sensor-to-target link as a genuine
+electrical signal – pulse-width-modulated (PWM) pulses and
+an on-chip digital-to-analog converter (DAC) voltage – carried
+over physical wires to the target microcontroller’s input pins,
+which places OneSensor firmly within the HIL tradition of
+electrical sensor emulation [7, 8] rather than a purely software-
+level mock.
+2. Related Work
+Sensor virtualization provides an abstraction between sens-
+ing resources and applications. Yuriyama and Kushida intro-
+duced a Sensor-Cloud Infrastructure that represents physical
+sensing resources through virtual sensors and virtual sensor
+groups [1]. Their architecture enables users and applications
+to provision and manage sensing resources without directly in-
+teracting with individual physical sensors. This concept is rele-
+vant to OneSensor because the proposed system also represents
+different sensing capabilities through virtual entities. However,
+the objective of OneSensor is not cloud-based management of
+physical sensors. Instead, the ESP32 itself generates the sen-
+sor values and provides them as controlled inputs to an external
+IoT system.
+CA4IOT proposed by Perera et al. focuses on context
+awareness in IoT systems [2]. The system attempts to reduce
+the complexity of selecting appropriate sensor information by
+understanding high-level user requirements and automatically
+configuring sensor filtering, fusion, and reasoning. This work
+is related to the scenario-based operation of OneSensor be-
+cause a selected environment can influence the behavior of
+multiple virtual sensors. However, CA4IOT primarily focuses
+on context-aware sensor information processing, whereas One-
+Sensor uses environmental scenarios to generate controlled test
+inputs.
+Dynamic sensor configuration was further explored by Per-
+era et al. through the Mobile Sensor Hub approach [3].
+Their system provides a mechanism for connecting external
+sensors and configuring communication between sensor de-
+vices and middleware. This is relevant to OneSensor’s con-
+figurable sensor-to-channel mapping, where the user can deter-
+mine which virtual sensor should be associated with a partic-
+ular output channel. The important distinction is that the Mo-
+bile Sensor Hub works with physical sensors, while OneSensor
+generates virtual sensor values.
+SensIaaS introduced sensor virtualization within a sensor-
+cloud infrastructure [4]. The work demonstrates how virtual-
+ized sensing resources can be managed as services and made
+available to applications. Similarly, the Big-Sensor-Cloud In-
+frastructure proposed by Chatterjee et al. investigates large-
+scale provisioning of heterogeneous sensing resources as ser-
+vices [5]. These systems demonstrate the scalability and flex-
+ibility of cloud-based sensor abstraction. OneSensor instead
+focuses on a compact embedded platform that can be directly
+used during IoT hardware development and testing.
+Zaidan et al. investigated virtual sensors for high-resolution
+air-pollution monitoring using artificial intelligence and IoT
+[6]. Their approach demonstrates how virtual sensing can es-
+timate environmental information using computational models
+and available data. This work provides motivation for the fu-
+ture extension of OneSensor toward machine-learning-based
+sensor behavior. In the proposed system, however, the primary
+purpose of the virtual sensor is not environmental estimation
+but controlled generation of test inputs for IoT applications.
+2.1 Hardware-in-the-Loop and F ault-Injection Literature
+A second, largely disjoint body of literature studies HIL test-
+ing as a general methodology for embedded and control sys-
+tems. Abdalla et al. describe a low-cost HIL framework built
+around a commodity analog/digital I/O card and Simulink, ex-
+plicitly modeling delay, noise, and saturation so that a con-
+troller under test experiences realistic, non-ideal signals rather
+than an idealized simulation [7]. National Instruments’ HIL
+test-system architecture similarly emphasizes electrical load
+and sensor emulation together with deterministic real-time I/O
+as the two pillars of a credible HIL rig [8]. OneSensor adopts
+the same principle – physically realistic PWM/DAC signals
+over real wires – but targets a very different price and complex-
+ity point, replacing PXI/CompactRIO-class real-time hardware
+with a single low-cost ESP32 module.
+On the fault-injection side, Elgharbawy et al. propose a
+generic architecture for injecting faults into virtual sensor sig-
+nals for Advanced Driver Assistance System (ADAS) testing,
+arguing that fault realism at the signal layer is essential for
+validating perception pipelines [9]. Magliano et al. present
+a configurable fault injector that manipulates a CPU’s micro-
+architectural state (registers and RAM) through a JTAG de-
+bug interface for reliability assessment of safety-critical em-
+bedded software [10], while Skarin et al.’s GOOFI-2 tool pro-
+vides a generic, campaign-based framework for injecting faults
+and collecting dependability measurements across heteroge-
+neous target platforms [11]. These frameworks operate pri-
+marily at the processor/memory level or at the level of a simu-
+lated perception signal; OneSensor is instead positioned at the
+physical analog/PWM sensor-interface layer that sits between
+a virtual sensor model and a real target microcontroller’s input
+pins, which is a comparatively underserved point in the fault-
+
+--- PAGE 3 ---
+injection design space for low-cost embedded prototyping. Fi-
+nally, low-cost ESP32 prototyping itself has been documented
+as an effective platform for IoT experimentation and education
+because of its integrated Wi-Fi, dual-core processor, and rich
+peripheral set [12, 13], which supports the choice of the ESP32
+as OneSensor’s virtual-sensing core.
+Table 1 summarizes how OneSensor’s positioning differs
+from the cloud-oriented sensor-virtualization literature and
+from the HIL/fault-injection literature discussed above.
+3. Problem Statement and Research Gap
+IoT applications often require multiple sensors during devel-
+opment and testing. Using physical sensors for every required
+input increases prototype cost and makes the testing process
+more complicated. In addition, environmental conditions such
+as fire, gas leakage, flooding, extreme temperature, or abnor-
+mal sensor behavior are difficult to reproduce safely and re-
+peatedly. Existing sensor virtualization research has mainly
+concentrated on virtual representations of physical sensing re-
+sources, cloud-based sensor management, context-aware pro-
+cessing, dynamic sensor configuration, and virtual estimation
+of environmental measurements.
+The research gap addressed by OneSensor is the integra-
+tion of virtual sensor generation and controlled Hardware-in-
+the-Loop testing on a low-cost embedded platform. The pro-
+posed system allows multiple sensor types to be represented
+by software-generated values on an ESP32 and provides mech-
+anisms for changing their configuration, environmental behav-
+ior, and fault conditions. The same platform can therefore be
+reused for different IoT projects without requiring a separate
+physical sensor set for every application.
+OneSensor also addresses the problem of reproducibility. A
+particular sensor condition can be generated repeatedly using
+the same configuration. This is useful for testing applications
+under abnormal conditions because the developer can repro-
+duce the same sensor behavior without physically recreating
+the corresponding environmental event.
+4. Proposed System
+OneSensor is proposed as an ESP32-based virtual multi-
+sensor platform for IoT development and testing. The central
+idea is to use the ESP32 as a virtual sensing device rather than
+connecting a separate physical sensor for every measurement
+required by an IoT application. The ESP32 generates sensor
+values according to predefined models and sends the generated
+values to an external device that represents the system under
+test.
+The initial virtual sensor set consists of temperature, humid-
+ity, gas, light, and soil moisture. Each sensor has a configurable
+range and behavior model. Instead of producing completely
+random numbers, the system can generate time-dependent val-
+ues that change gradually under normal conditions. The gen-
+erated value can subsequently be modified according to the se-
+lected environmental scenario or fault condition.
+The proposed architecture consists of a web dashboard, con-
+figuration manager, scenario engine, virtual sensor models,
+Figure 1. Conceptual architecture of the OneSensor platform.
+fault injection engine, channel manager, and output interface.
+The user interacts with the dashboard through a browser. The
+selected configuration is processed by the ESP32, which gen-
+erates the corresponding virtual sensor values and routes them
+through the configured output channels. Fig. 1 shows this con-
+ceptual flow.
+One of the important features of OneSensor is dynamic
+sensor-to-channel mapping. The user can select a virtual sensor
+and assign it to a particular output channel from the dashboard.
+This provides flexibility because the same ESP32 platform can
+be configured differently for different IoT projects. For exam-
+ple, a temperature model may be assigned to one channel dur-
+ing one experiment and replaced by a gas model during another
+experiment without changing the core hardware.
+The system also introduces scenario-based simulation. A
+scenario represents an environmental condition in which multi-
+ple sensor values may change together. For example, a fire sce-
+nario can produce increasing temperature and gas values, while
+an agriculture scenario can produce variations in soil moisture,
+temperature, humidity, and light. This relationship between
+multiple sensor values provides more meaningful test data than
+independent random-value generation.
+5. System Architecture
+The OneSensor architecture is divided into several func-
+tional layers, shown in Fig. 2. The first layer is the user inter-
+face, implemented as a web dashboard hosted by or connected
+to the ESP32. The dashboard provides controls for selecting
+virtual sensors, assigning output channels, choosing scenarios,
+
+--- PAGE 4 ---
+Table 1: Comparison of OneSensor with Related Sensor-Virtualization and HIL/Fault-Injection Approaches
+Approach Sensing Model Signal Delivered to DUT Fault Injection Cost / Deployment
+Sensor-Cloud Infras-
+tructure [1]
+Cloud-managed virtual sen-
+sor objects
+Data/API values (no electri-
+cal signal)
+Not addressed Cloud infrastructure
+CA4IOT [2] Context-aware sensor data
+processing
+Data/API values Not addressed Middleware service
+Mobile Sensor Hub [3] Dynamic config. of physi-
+cal sensors
+Data via middleware Not addressed Middleware service
+SensIaaS / Big-Sensor-
+Cloud [4, 5]
+Sensor-cloud
+virtualization-as-a-service
+Data/API values Not addressed Cloud infrastructure
+AI Virtual Sensors [6] ML-estimated environmen-
+tal measurement
+Data values Not addressed Cloud / edge compute
+Commodity HIL kit
+[7]
+Plant simulation + ADDA
+card
+Analog voltage (8-bit, 2
+ch.)
+Not addressed Low-cost ADDA card +
+PC
+Commercial HIL
+(PXI/SLSC) [8]
+Electrical load/sensor emu-
+lation
+Analog/digital, multi-
+channel
+Signal conditioning
+faults
+High-cost real-time rig
+ADAS virtual sensor
+faults [9]
+Simulated perception-
+sensor signal
+Simulated signal (not phys-
+ical wire)
+Rich, sensor-level fault
+set
+Simulation toolchain
+OneSensor (pro-
+posed)
+ESP32-generated virtual
+sensor
+Physical PWM / DAC sig-
+nal, 12 ch.
+Dropout, stuck, noise,
+spike, drift, discon-
+nect, latency
+Single low-cost micro-
+controller pair
+configuring fault conditions, and observing generated sensor
+values.
+The second layer is the configuration manager. It stores the
+current sensor selection and channel mapping. Each output
+channel can be associated with a particular virtual sensor ac-
+cording to the requirements of the IoT application being tested.
+This allows the same physical OneSensor device to support dif-
+ferent application configurations.
+The third layer contains the virtual sensor models. Each
+model is responsible for generating values corresponding to
+a specific sensor type. The models can use predefined
+ranges, gradual changes, relationships between variables, and
+scenario-specific behavior. The generated values are passed to
+the fault injection layer before being delivered to the output
+interface. As summarized in Table 2, the current prototype im-
+plements twelve concurrently addressable channels, each de-
+scribed by a configuration record giving its output GPIO, signal
+type, dynamic range, default value, and calibration factors.
+The fourth layer is the scenario and fault injection layer. Sce-
+narios modify sensor behavior according to predefined envi-
+ronmental conditions. Fault injection intentionally introduces
+abnormal behavior such as noisy data, stuck values, sudden
+spikes, sensor offline conditions, or delayed transmission.
+The final layer is the output interface. It transfers the gener-
+ated values from the ESP32 to the external system under test.
+In the prototype, an Arduino UNO can be used as the receiving
+device. The Arduino processes the incoming sensor values as
+inputs for the application being tested; a companion decoder
+library recovers the pulse duty cycle (for PWM channels) or
+the sampled analog voltage (for DAC channels) and converts it
+back into the original engineering unit through the inverse of
+the linear mapping applied on the ESP32 side.
+6. Fault Injection and Testing
+Fault injection is included to evaluate how an IoT applica-
+tion responds to abnormal sensor conditions. The system can
+intentionally introduce conditions such as sensor offline behav-
+ior, noisy readings, stuck values, sudden spikes, gradual drift,
+and delayed transmission. Because these faults are software-
+controlled, the same condition can be reproduced multiple
+times during testing.
+A normal sensor value can be represented as
+S(t) =B + T (t) +E(t) +N(t), (1)
+where B is the baseline value, T (t) represents the time-
+dependent component, E(t) represents the environmental sce-
+nario, and N(t) represents controlled variation.
+The fault injection layer transforms the normal value accord-
+ing to the selected fault condition. For example, a spike fault
+can temporarily increase the value, while a stuck-sensor fault
+can maintain a previously generated value for a specified pe-
+riod. Table 3 summarizes the seven fault classes implemented
+in the current prototype and the transformation each applies
+to the incoming value before it reaches the output interface,
+shown schematically in Fig. 3.
+The testing process follows a Hardware-in-the-Loop con-
+cept. The ESP32 generates the virtual sensor input while the
+Arduino UNO executes the application logic normally used
+with sensor data. The developer can therefore evaluate the be-
+havior of the external application under normal, environmental,
+and faulty conditions.
+Table 4 positions OneSensor’s fault-injection layer relative
+to the fault-injection frameworks discussed in Section 2.1. Un-
+like frameworks that manipulate processor registers or mem-
+ory [10] or a generic dependability-campaign target [11], and
+
+--- PAGE 5 ---
+Figure 2. Layered system architecture of OneSensor, showing the dashboard and configuration layers, the virtual-sensor, scenario, fault, and
+output layers hosted inside the ESP32, and the physically wired Arduino UNO target.
+unlike ADAS fault injection that operates on a simulated per-
+ception signal [9], OneSensor injects faults directly into the
+physical analog/PWM signal delivered to a real target micro-
+controller, which exercises the target’s actual input-decoding
+and signal-conditioning code path rather than only its applica-
+tion logic.
+7. Implementation
+The prototype is implemented using an ESP32 development
+board and an Arduino UNO. The ESP32 is the primary One-
+Sensor device and is responsible for virtual sensor generation
+and configuration. The Arduino UNO is treated as the external
+system under test. The initial implementation establishes the
+communication path between the two devices before progres-
+sively adding the complete dashboard and simulation features.
+In the initial stage, the ESP32 generates a virtual sensor
+value and provides an equivalent electrical output that can be
+read by the Arduino. This approach validates the basic concept
+that software-generated sensor information can be supplied to
+another microcontroller as an input. The signal path is there-
+fore ESP32 virtual sensor generation, output interface, Arduino
+input, and application processing.
+The ESP32 provides Wi-Fi connectivity that can be used for
+communication with the browser-based dashboard. HTTP can
+be used for dashboard requests and configuration, while Web-
+Socket communication can provide real-time updates of gener-
+ated sensor values. MQTT can optionally be supported for ex-
+ternal IoT integration. Table 5 summarizes the software stack
+used across the two ends of the current prototype.
+Fig. 4 and Fig. 5 indicate the intended layout of the two pri-
+mary dashboard views once the browser-based front end is fi-
+nalized: a live telemetry view showing the twelve virtual chan-
+nels, and a configuration view for sensor-to-channel mapping
+and fault arming.
+The system is designed in a modular manner so that the vir-
+tual sensor generation layer is independent of the dashboard
+and output layer. This makes it possible to add additional vir-
+tual sensors without redesigning the complete system. It also
+provides a foundation for future machine-learning-based sen-
+sor models.
+8. IoT Technology and Communication
+The ESP32 is selected as the main controller because it pro-
+vides sufficient processing capability, Wi-Fi connectivity, mul-
+tiple GPIO interfaces, and a low-cost development platform
+[12, 13]. Wi-Fi enables the OneSensor device to communicate
+with a browser-based dashboard without requiring additional
+networking hardware.
+HTTP is suitable for configuration and dashboard requests
+because it provides a simple communication mechanism be-
+tween the browser and the ESP32. WebSocket can be used
+when continuous real-time sensor updates are required because
+it allows persistent communication between the dashboard and
+the device. MQTT can be considered for future integration
+with external IoT platforms where a publish-subscribe com-
+munication model is required.
+
+--- PAGE 6 ---
+Table 2: Virtual Sensor Channel Configuration in the Current Prototype
+Ch. Virtual Sensor Signal Type Output GPIO Range Default Encoding
+0 Temperature DAC 25 0–50 ◦C 25 ◦C 8-bit DAC
+1 Humidity DAC 26 0–100 % 50 % 8-bit DAC
+2 Gas PWM 18 0–1000 ppm 300 ppm 10-bit, 500 Hz
+3 Light PWM 19 0–1000 lux 500 lux 10-bit, 500 Hz
+4 Soil Moisture PWM 21 0–100 % 50 % 10-bit, 500 Hz
+5 Motion X PWM 22 −2–+2 g 0 g 10-bit, 500 Hz
+6 Motion Y PWM 23 −2–+2 g 0 g 10-bit, 500 Hz
+7 Motion Z PWM 27 −2–+2 g 1 g 10-bit, 500 Hz
+8 Proximity PWM 32 2–400 cm 50 cm 10-bit, 500 Hz
+9 Sound Level PWM 33 30–120 dB 40 dB 10-bit, 500 Hz
+10 UV Index PWM 14 0–11 idx 2 idx 10-bit, 500 Hz
+11 CO 2 PWM 12 400–5000 ppm 420 ppm 10-bit, 500 Hz
+Figure 3. Signal path from the baseline sensor model, through sce-
+nario composition and fault injection, to the Arduino UNO under test.
+The Arduino UNO acts as the system under test. It receives
+the generated sensor input and executes the application logic.
+This separation between the OneSensor device and the appli-
+cation controller makes it possible to test different IoT applica-
+tions using the same virtual sensor platform.
+9. Expected Results and Discussion
+The expected result of the OneSensor prototype is a func-
+tional ESP32-based device capable of generating multiple vir-
+tual sensor values and providing them to an external IoT con-
+troller. The user should be able to select sensor types, configure
+their output channels, select predefined environmental scenar-
+ios, and introduce controlled sensor faults.
+The system is expected to reduce the number of physical sen-
+sors required during the initial development and testing stages.
+It also provides a repeatable method for testing abnormal con-
+Table 3: Fault Transformation Summary
+Fault Transformation Behavior
+Dropout y(t)=y(tlast) Freezes at last valid out-
+put
+Stuck y(t)=M Clamps to constant M
+Noise y(t)=x(t)+N (0, M2) Zero-mean Gaussian jit-
+ter
+Spike y(t)=x(t)+∆spike Transient large excursion
+Drift y(t)=x(t)+M· t−t01000 Accumulating linear off-
+set
+Disconnect y(t)=NaN Mutes electrical output
+Latency y(t)=x(t−∆t) Ring-buffer delayed re-
+play
+Table 4: Fault-Injection Target Layer Comparison
+Framework Fault Target Layer Physical Signal?
+GOOFI-2 [11] Processor/memory
+(campaign-based)
+No
+Magliano et al.
+[10]
+CPU registers / RAM
+via JTAG
+No
+ADAS sensor
+faults [9]
+Simulated perception
+signal
+No
+OneSensor Physical
+PWM/DAC sen-
+sor signal
+Y es
+ditions. For example, a developer can repeatedly apply a sud-
+den gas-value spike or sensor-offline condition and observe
+how the application responds.
+The proposed system is not intended to completely replace
+physical sensors during final deployment. Physical sensors
+are still required when testing actual electrical characteristics,
+calibration behavior, hardware noise, and real environmental
+measurements. OneSensor primarily addresses software and
+application-level testing where controlled sensor inputs are suf-
+ficient.
+The prototype also provides a foundation for automated
+
+--- PAGE 7 ---
+Table 5: Implementation Stack Summary
+Tier Technology
+ESP32
+firmware
+Arduino core on ESP32, asynchronous
+HTTP/WebSocket server, LEDC
+PWM and on-chip DAC drivers
+Dashboard
+client
+Browser-based single-page application
+communicating over HTTP and Web-
+Socket
+Target device Arduino UNO (ATmega328P) with a
+pulse-width/analog decoder library
+Figure 4. Placeholder for the live-telemetry dashboard screenshot.
+testing. Multiple scenarios and faults can be executed se-
+quentially, allowing developers to observe the application’s re-
+sponse across different operating conditions. Quantities such
+as end-to-end latency, PWM phase jitter under simultaneous
+Wi-Fi activity, and Arduino-side decoder CPU overhead are
+architectural properties that can be derived from the channel
+and timing configuration in Table 2, but they require empiri-
+cal measurement on physical hardware and are left for future
+evaluation rather than claimed here.
+10. Future Scope
+The current architecture provides several possibilities for fu-
+ture development. Machine-learning-based virtual sensor mod-
+els can be introduced by training models using real sensor
+datasets. Instead of relying only on mathematical equations,
+the system could learn temporal patterns, correlations between
+sensors, and realistic variations from recorded measurements.
+This can improve the realism of generated sensor data.
+Another direction is protocol-level sensor emulation. Future
+versions can investigate emulation of interfaces such as I2C,
+SPI, UART, and OneWire communication. This would allow
+OneSensor to test applications that depend on existing sensor
+libraries without requiring the actual sensor hardware.
+The dashboard can also be extended with automated test se-
+quences. A developer could define a sequence containing nor-
+mal operation, scenario changes, fault injection, recovery, and
+data logging. The platform could execute the sequence auto-
+matically and generate a report of the observed system behav-
+ior.
+Figure 5. Placeholder for the sensor-to-channel configuration and
+fault-injection panel screenshot.
+Additional future work includes cloud integration, mobile
+monitoring, more virtual sensor models, dataset-based scenario
+generation, a plugin architecture through which developers can
+add new sensor models without modifying the core system, and
+a systematic empirical benchmarking study – along the lines
+of the HIL evaluation methodology reported for commodity
+ADDA-card rigs [7] – to quantify end-to-end latency, jitter, and
+decoder overhead on physical hardware.
+11. Conclusion
+OneSensor presents a low-cost ESP32-based approach for
+virtualizing multiple sensor inputs for IoT development and
+testing. The proposed system uses the ESP32 as the main vir-
+tual sensor device and an Arduino UNO or another controller as
+the system under test. By generating configurable sensor val-
+ues, the platform can reduce dependence on multiple physical
+sensors during the development stage.
+The combination of sensor-to-channel mapping, environ-
+mental scenario simulation, fault injection, and browser-based
+configuration provides a controlled environment for testing IoT
+applications. Unlike approaches that primarily focus on cloud-
+based sensor management, OneSensor focuses on providing
+virtual sensor inputs directly to an embedded IoT system, and
+unlike fault-injection frameworks that target processor state or
+simulated signals, OneSensor injects faults directly into the
+physical sensor-interface layer seen by the target device.
+The current prototype establishes the fundamental ESP32-
+to-Arduino testing concept across twelve virtual sensor chan-
+nels, while future development will extend the platform toward
+more accurate sensor protocol emulation, machine-learning-
+based sensor behavior, automated test sequences, and cloud
+connectivity. The proposed platform therefore provides a prac-
+tical foundation for low-cost, reusable, and repeatable IoT de-
+velopment and testing.
+Acknowledgment
+The authors would like to thank their project guide and the
+Department of Computer Engineering for their guidance and
+support during the development of the OneSensor project.
+
+--- PAGE 8 ---
+References
+[1] M. Yuriyama and T. Kushida, “Sensor-Cloud Infrastruc-
+ture: Physical Sensor Management with Virtualized Sen-
+sors on Cloud Computing,” in Proc. 13th Int. Conf.
+Network-Based Information Systems, 2010, pp. 1–8.
+[2] C. Perera, A. Zaslavsky, P. Christen, and D. Geor-
+gakopoulos, “CA4IOT: Context Awareness for Internet of
+Things,” in Proc. IEEE Green Computing and Commu-
+nications and IEEE Internet of Things and IEEE Cyber ,
+Physical and Social Computing , 2012, pp. 775–782.
+[3] C. Perera, P. Jayaraman, A. Zaslavsky, P. Christen, and
+D. Georgakopoulos, “Dynamic Configuration of Sen-
+sors Using Mobile Sensor Hub in Internet of Things
+Paradigm,” in Proc. IEEE Int. Conf. Intelligent Sensors,
+Sensor Networks and Information Processing , 2013, pp.
+473–478.
+[4] S. Bose and N. Mukherjee, “SensIaaS: A Sensor-Cloud
+Infrastructure with Sensor Virtualization,” in Proc. IEEE
+3rd Int. Conf. Cyber Security and Cloud Computing ,
+2016, pp. 232–239.
+[5] S. Chatterjee et al., “Big-Sensor-Cloud Infrastructure:
+A Holistic Prototype for Provisioning Sensors-as-a-
+Service,” IEEE Trans. Cloud Computing, 2021.
+[6] M. A. Zaidan et al., “Virtual Sensors: Toward High-
+Resolution Air Pollution Monitoring using AI and IoT,”
+IEEE Internet of Things Magazine , vol. 6, no. 1, pp. 76–
+81, 2023.
+[7] O. M. Abdalla, S. A. Hammad, and A. H. Yousef,
+“A Framework for Real-Time Hardware-in-the-
+Loop Simulation for Control Design,” arXiv preprint
+arXiv:1410.1342, 2014.
+[8] National Instruments, “The Hardware-in-
+the-Loop (HIL) Test System Architec-
+ture,” NI White Paper. [Online]. Available:
+https://www.ni.com/en/solutions/transportation/hardware-
+in-the-loop/hardware-in-the-loop–hil–test-system-
+architectures.html
+[9] M. Elgharbawy, A. Schwarzhaupt, G. Scheike, M. Frey,
+and F. Gauterin, “A Generic Architecture of ADAS Sen-
+sor Fault Injection for Virtual Tests,” in Proc. IEEE/ACS
+13th Int. Conf. Computer Systems and Applications
+(AICCSA), 2016.
+[10] E. Magliano, A. Savino, and S. Di Carlo, “Real-Time
+Embedded System Fault Injector Framework for Micro-
+Architectural State Based Reliability Assessment,” Jour-
+nal of Electronic Testing , vol. 41, no. 2, pp. 193–208,
+2025.
+[11] D. Skarin, R. Barbosa, and J. Karlsson, “GOOFI-2: A
+Tool for Experimental Dependability Assessment,” in
+Proc. IEEE/IFIP Int. Conf. Dependable Systems and Net-
+works (DSN), 2010, pp. 557–562.
+[12] D. Hercog, T. Lerher, M. Trunti ˇc, and O. Teˇzak, “Design
+and Implementation of ESP32-Based IoT Devices,” Sen-
+sors, vol. 23, no. 15, p. 6739, 2023.
+[13] A. Maier, A. Sharp, and Y . Vagapov, “Comparative Anal-
+ysis and Practical Implementation of the ESP32 Micro-
+controller Module for the Internet of Things,” in Proc.
+7th IEEE Int. Conf. Internet Technologies and Applica-
+tions (ITA-17), Wrexham, U.K., 2017.

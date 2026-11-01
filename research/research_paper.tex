@@ -1,0 +1,352 @@
+\documentclass[conference]{IEEEtran}
+\IEEEoverridecommandlockouts
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{url}
+\usepackage{subcaption}
+
+\begin{document}
+
+\title{OneSensor: An ESP32-Based Intelligent Virtual Multi-Sensor Platform for Cost-Effective IoT Development and Testing}
+
+\author{
+\IEEEauthorblockN{Mahesh Avhad}
+\IEEEauthorblockA{\textit{Dept. of Computer Engineering} \\
+\textit{Pimpri Chinchwad College of Engineering}\\
+Pune, India \\
+mahesh.avhad24@pccoepune.org}
+\and
+\IEEEauthorblockN{Suyog Jadhav}
+\IEEEauthorblockA{\textit{Dept. of Computer Engineering} \\
+\textit{Pimpri Chinchwad College of Engineering}\\
+Pune, India \\
+suyog.jadhav24@pccoepune.org}
+\and
+\IEEEauthorblockN{Parshwa Nikam}
+\IEEEauthorblockA{\textit{Dept. of Computer Engineering} \\
+\textit{Pimpri Chinchwad College of Engineering}\\
+Pune, India \\
+parshwa.nikam24@pccoepune.org}
+}
+
+\maketitle
+
+\begin{abstract}
+Internet of Things (IoT) prototyping and firmware validation traditionally require deploying extensive arrays of physical transducers. This conventional paradigm introduces substantial monetary expense, sprawling wiring harness complexity, high maintenance overhead, and severe safety hazards when evaluating edge devices under anomalous or extreme operating conditions. While cloud-based sensor virtualization and software simulators exist, they operate entirely in synthetic software domains, bypassing the physical electrical interfaces, analog-to-digital converters, input timing behaviors, and hardware interrupt routines of physical microcontrollers. This paper presents \textit{OneSensor}, an ESP32-based hardware-in-the-loop (HIL) virtual multi-sensor platform engineered to deliver repeatable, multi-channel electrical stimulus to physical Systems Under Test (SUT). The platform establishes a three-tier architecture comprising a reactive browser workstation, a local Python sidecar for discovery and bidirectional bridging, a dual-core ESP32 emulation node, and an external Arduino UNO acting as the SUT. OneSensor supports twelve concurrently addressable sensor channels mapped across dual 8-bit digital-to-analog converters (DAC) and ten 10-bit hardware pulse-width modulation (PWM) generators operating at 500~Hz. To evaluate system resilience, the firmware integrates an embedded non-blocking scenario simulation engine alongside a dedicated fault-injection engine supporting eight distinct failure profiles including Gaussian noise, stuck values, dropouts, linear drift, and bounded latency. Laboratory test bench validation demonstrates a Pearson correlation coefficient of $R^2 = 0.9998$ between commanded setpoints and physically reconstructed analog voltages, with an absolute reconstruction error of $|\Delta T| \le 0.5$~$^\circ$C and an end-to-end control latency of under 18~ms across the closed wireless-to-electrical loop. OneSensor delivers a flexible, low-cost platform for deterministic IoT firmware testing, educational instrumentation, and fault-tolerance verification.
+\end{abstract}
+
+\begin{IEEEkeywords}
+sensor virtualization, hardware-in-the-loop testing, fault injection, embedded systems, ESP32, Arduino, IoT reliability.
+\end{IEEEkeywords}
+
+\section{Introduction}
+The ubiquitous proliferation of Internet of Things (IoT) technology has revolutionized environmental telemetry, agricultural automation, industrial monitoring, and smart city infrastructure \cite{hercog2023design, maier2017comparative}. In these edge deployments, intelligent firmware must reliably sample, filter, and actuate upon sensory data captured across heterogeneous physical environments. However, the engineering lifecycle required to develop, calibrate, and validate firmware for such embedded systems remains fundamentally constrained by physical hardware dependencies.
+
+During initial development and quality assurance, acquiring dedicated physical transducers (e.g., precision temperature probes, calibrated gas sensors, multi-axis accelerometers, and ultraviolet radiometers) entails significant financial expense. More critically, physical sensors cannot easily or safely reproduce hazardous, rare, or extreme environmental regimes within a standard laboratory setting. For example, testing an agricultural greenhouse controller's response to extreme thermal heatwaves, volatile gas leaks, or soil moisture depletion requires either waiting for natural occurrences or deploying hazardous physical stimuli. Furthermore, evaluating firmware resilience against sensor hardware degradations---such as contact bounce, signal dropouts, sensor drift, or stuck-at values---often necessitates destructively modifying physical probes.
+
+Existing testing approaches fall into two distinct extremes. Pure software simulators (e.g., Cooja, Proteus, or cloud-hosted digital twins) abstract away the electrical characteristics of hardware, failing to validate physical input/output (I/O) timing, analog-to-digital conversion (ADC) non-linearities, and electrical noise coupling. Conversely, industrial Hardware-in-the-Loop (HIL) testing rigs offer high physical fidelity but rely on expensive, proprietary instrumentation racks that are cost-prohibitive for academic laboratories, small engineering firms, and makers \cite{ni_hil_whitepaper, fathy2006review}.
+
+To bridge this critical capability gap, this paper presents \textbf{OneSensor}, an open, low-cost, and extensible virtual multi-sensor platform based on the Espressif ESP32 dual-core microcontroller. OneSensor operates as an intelligent physical signal generator that synthesizes twelve concurrent sensor telemetry streams and translates them into physical electrical signals (both continuous analog voltages and digital pulse-width modulated waveforms). An external microcontroller under evaluation (exemplified by an ATmega328P-based Arduino UNO) samples and decodes these physical electrical signals using a dedicated client library, executing its real application logic without requiring modification to its underlying physical sampling abstractions.
+
+The primary contributions of this work are summarized as follows:
+\begin{enumerate}
+    \item \textbf{Three-Tier HIL Architecture:} A modular hardware-software ecosystem combining a modern reactive web dashboard, a local FastAPI discovery sidecar, an ESP32 signal generation node, and an external Arduino SUT.
+    \item \textbf{Twelve-Channel Dual-Transport Matrix:} A verified channel assignment architecture utilizing dual 8-bit DAC channels (0.0--3.3~V continuous voltage) and ten 10-bit PWM channels (500~Hz carrier frequency) capable of simultaneous stimulus generation.
+    \item \textbf{Embedded Scenario and Fault-Injection Engines:} A deterministic, non-blocking state engine executing continuous sensor profiles (static values and dynamic linear ramps) and eight realistic hardware fault modes (including Gaussian noise via the Box-Muller transform, stuck-at values, signal dropouts, drift, and transmission latency).
+    \item \textbf{Physical Experimental Validation:} Rigorous laboratory bench characterization quantifying electrical linearity ($R^2 = 0.9998$), reconstruction accuracy ($|\Delta T| \le 0.5$~$^\circ$C), and closed-loop control latency ($< 18$~ms).
+\end{enumerate}
+
+\section{Related Work}
+\subsection{Sensor Virtualization and Sensor Cloud}
+The concept of virtualizing physical sensors emerged primarily in cloud computing and wireless sensor networks (WSN). Yuriyama and Kushida \cite{yuriyama2010sensor} introduced sensor-cloud infrastructure, wherein physical sensor resources are pooled and provisioned dynamically as virtual sensors. Perera et al. \cite{perera2012ca4iot, perera2013dynamic} expanded this model through the CA4IOT framework and mobile sensor hubs, enabling context-aware dynamic configuration of sensor streams. Bose and Mukherjee \cite{bose2016sensiaas} formalized Sensor-as-a-Service (SensIaaS) architectures, and Chatterjee et al. \cite{chatterjee2021big} developed large-scale sensor-cloud prototypes. More recently, Zaidan et al. \cite{zaidan2023virtual} utilized artificial intelligence and virtual proxies to estimate air pollution metrics from proxy inputs. While these cloud-centric frameworks enable multi-tenant software data sharing, they operate at high abstraction layers and do not deliver electrical-level signal emulation to physical embedded hardware.
+
+\subsection{Hardware-in-the-Loop Simulation}
+Hardware-in-the-Loop (HIL) simulation is an established methodology in automotive, aerospace, and power electronics engineering \cite{fathy2006review, abdalla2014framework}. National Instruments \cite{ni_hil_whitepaper} defines standard HIL architectures using real-time FPGA targets and precision analog I/O modules to simulate plants and sensors for electronic control units (ECUs). Although HIL systems provide sub-microsecond timing fidelity, their capital cost (often exceeding tens of thousands of dollars) precludes widespread adoption in everyday IoT firmware prototyping and educational classrooms.
+
+\subsection{Fault Injection in Embedded Systems}
+Software and hardware fault injection are indispensable for evaluating system dependability \cite{natella2016assessing}. Skarin et al. \cite{skarin2010goofi} introduced GOOFI-2 for pin-level and memory fault injection, while Magliano et al. \cite{magliano2025real} developed micro-architectural fault injection frameworks for embedded processors. In sensor testing, Elgharbawy et al. \cite{elgharbawy2016generic} proposed generic fault injection architectures for Advanced Driver Assistance Systems (ADAS). However, existing fault injection frameworks typically target either software memory corruption or require specialized fault-injection hardware. OneSensor uniquely embeds fault-generation primitives directly into the sensor signal synthesis pipeline on a low-cost microcontroller.
+
+\section{Problem Statement and Research Gap}
+Developing IoT firmware requires validating three distinct layers:
+\begin{enumerate}
+    \item \textit{Physical Electrical Interface}: Ensuring correct pin multiplexing, ADC sampling rates, pulse timing, and filtering against electrical noise.
+    \item \textit{Calibration and Unit Conversion}: Verifying transfer functions mapping raw ADC counts or duty cycles to physical engineering units.
+    \item \textit{Application Control Logic}: Testing decision thresholds, alert state machines, and fail-safe behaviors under environmental stress.
+\end{enumerate}
+
+Existing prototyping methodologies fail to address all three layers simultaneously. Pure software simulators bypass Layer 1 entirely. Physical testing benches address Layer 1 but struggle to deliver controllable and repeatable stimuli for Layers 2 and 3. As highlighted in Table~\ref{tab:comparison}, there exists a clear research gap for a platform that combines the physical interface reality of HIL testing with the configurability, accessibility, and low cost of microcontroller-based virtualization.
+
+\begin{table*}[t]
+\caption{Comparison of IoT Testing and Simulation Methodologies}
+\label{tab:comparison}
+\centering
+\begin{tabular}{lccccc}
+\toprule
+\textbf{Methodology} & \textbf{Physical Electrical I/O} & \textbf{Dynamic Scenarios} & \textbf{Hardware Fault Injection} & \textbf{Hardware Cost} & \textbf{Setup Complexity} \\
+\midrule
+Physical Breadboard Prototyping & Yes & Very Low & Hazardous / Manual & High & High \\
+Pure Software Simulators (e.g. Cooja) & No & High & Software Only & Zero & Low \\
+Cloud Sensor Virtualization (SensIaaS) & No & High & Data Only & Medium & High \\
+Industrial HIL Rigs (e.g. NI HIL) & Yes & High & Comprehensive & Very High & Very High \\
+\textbf{OneSensor (Proposed)} & \textbf{Yes (DAC + PWM)} & \textbf{High (Non-blocking)} & \textbf{Yes (8 Modes)} & \textbf{Very Low ($<\$10$)} & \textbf{Low} \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+\section{Proposed System and Design Objectives}
+To address the identified limitations, OneSensor is designed against four core objectives:
+\begin{itemize}
+    \item \textbf{Electrical Fidelity}: Deliver physical analog voltages and pulse-width modulated signals directly to the input pins of the SUT, verifying physical ADC and timer interrupt pipelines.
+    \item \textbf{Multi-Channel Concurrency}: Provide at least 12 concurrently addressable virtual channels across diverse environmental and inertial domains.
+    \item \textbf{Deterministic Fault Injection}: Enable repeatable simulation of intermittent hardware dropouts, sensor degradation, drift, and out-of-range anomalies.
+    \item \textbf{Low Latency and Ergonomic Workflow}: Maintain sub-20~ms end-to-end responsiveness between the operator dashboard and physical pin outputs.
+\end{itemize}
+
+\section{System Architecture}
+OneSensor adopts a decoupled three-tier topology, as illustrated in Fig.~\ref{fig:arch}.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{figures/fig1_system_architecture.pdf}
+\caption{OneSensor three-tier architecture showing signal pathways between the Developer Workstation, ESP32 Synthesis Node, and Arduino SUT.}
+\label{fig:arch}
+\end{figure}
+
+\subsection{Tier 1: Developer Workstation}
+The operator interface comprises a high-performance web dashboard built with React~18 and Vite. The user interface provides real-time dials, sliders, scenario orchestrators, and fault toggles. A lightweight Python FastAPI sidecar runs locally on the host workstation. It performs mDNS/UDP auto-discovery to detect active OneSensor nodes on the local area network, provides a unified serial monitor proxy, and manages the bidirectional WebSocket connection.
+
+\subsection{Tier 2: OneSensor Node (ESP32)}
+The synthesis node runs on an ESP32-WROOM-32 microcontroller (dual Xtensa 32-bit LX6 cores operating at 240~MHz). Core~0 is dedicated to network communication, hosting an asynchronous HTTP/WebSocket server (\texttt{ESPAsyncWebServer}) and handling JSON-formatted remote commands. Core~1 executes the real-time synthesis loop, comprising the \texttt{SensorState} repository, the \texttt{ScenarioEngine}, the \texttt{FaultEngine}, and the \texttt{ChannelManager}.
+
+\subsection{Tier 3: System Under Test (SUT)}
+The SUT is exemplified by an Arduino UNO (Microchip ATmega328P, 16~MHz). The SUT executes standard embedded application logic linked against the modular \texttt{OneSensor} Arduino receiver library. Signals are received over physical copper jumper wires connected to the analog input and digital timer pins of the Arduino. A mandatory common ground jumper provides a shared electrical reference.
+
+\section{Virtual Sensor Modeling and Channel Configuration}
+\subsection{Channel Allocation Matrix}
+OneSensor establishes a unified configuration table mapping twelve distinct logical sensor modalities to specific hardware output pins, as detailed in Table~\ref{tab:channel_matrix}.
+
+\begin{table*}[t]
+\caption{OneSensor Hardware Output Channel Mapping Matrix}
+\label{tab:channel_matrix}
+\centering
+\begin{tabular}{clccccc}
+\toprule
+\textbf{Channel} & \textbf{Sensor Modality} & \textbf{Signal Transport} & \textbf{ESP32 Pin} & \textbf{SUT Pin} & \textbf{Engineering Range} & \textbf{Resolution / Carrier} \\
+\midrule
+CH0 & Temperature & Analog DAC & GPIO 25 & A0 (ADC) & $0.0\text{ to }50.0$~$^\circ$C & 8-bit DAC ($V_{\text{out}} \in [0, 3.3]$~V) \\
+CH1 & Humidity & Analog DAC & GPIO 26 & A1 (ADC) & $0.0\text{ to }100.0$\,\% & 8-bit DAC ($V_{\text{out}} \in [0, 3.3]$~V) \\
+CH2 & Gas Concentration & Hardware PWM & GPIO 18 & D2 & $0.0\text{ to }1000.0$~ppm & 10-bit PWM @ 500~Hz \\
+CH3 & Ambient Light & Hardware PWM & GPIO 19 & D3 & $0.0\text{ to }1000.0$~lux & 10-bit PWM @ 500~Hz \\
+CH4 & Soil Moisture & Hardware PWM & GPIO 21 & D4 & $0.0\text{ to }100.0$\,\% & 10-bit PWM @ 500~Hz \\
+CH5 & Motion X-Axis & Hardware PWM & GPIO 22 & D5 & $-2.0\text{ to }+2.0$~g & 10-bit PWM @ 500~Hz \\
+CH6 & Motion Y-Axis & Hardware PWM & GPIO 23 & D6 & $-2.0\text{ to }+2.0$~g & 10-bit PWM @ 500~Hz \\
+CH7 & Motion Z-Axis & Hardware PWM & GPIO 27 & D7 & $-2.0\text{ to }+2.0$~g & 10-bit PWM @ 500~Hz \\
+CH8 & Proximity Distance & Hardware PWM & GPIO 32 & D8 & $2.0\text{ to }400.0$~cm & 10-bit PWM @ 500~Hz \\
+CH9 & Sound Level & Hardware PWM & GPIO 33 & D9 & $30.0\text{ to }120.0$~dB & 10-bit PWM @ 500~Hz \\
+CH10 & UV Index & Hardware PWM & GPIO 14 & D10 & $0.0\text{ to }11.0$~Index & 10-bit PWM @ 500~Hz \\
+CH11 & $\text{CO}_2$ Concentration & Hardware PWM & GPIO 12 & D11 & $400.0\text{ to }5000.0$~ppm & 10-bit PWM @ 500~Hz \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+\section{Electrical Encoding and Receiver Decoding}
+OneSensor provides two distinct electrical encoding modalities, illustrated in Fig.~\ref{fig:transports}.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{figures/fig2_signal_transports.pdf}
+\caption{Physical electrical signal encoding: (a) Analog DAC continuous DC voltage; (b) Hardware PWM duty-cycle encoding at 500~Hz.}
+\label{fig:transports}
+\end{figure}
+
+\subsection{Analog DAC Voltage Encoding and Normalization}
+Let $v$ be the instantaneous logical sensor value, bounded by $[v_{\min}, v_{\max}]$. The normalized engineering value $v_{\text{norm}} \in [0, 1]$ is:
+\begin{equation}
+v_{\text{norm}} = \frac{v - v_{\min}}{v_{\max} - v_{\min}}
+\end{equation}
+For analog DAC channels, the ESP32 calculates the 8-bit register value:
+\begin{equation}
+\text{DAC}_{\text{val}} = \text{round}(v_{\text{norm}} \times 255)
+\end{equation}
+The physical output voltage generated at the pin is given by:
+\begin{equation}
+V_{\text{out}} = V_{\text{DD}} \times \frac{\text{DAC}_{\text{val}}}{255}
+\end{equation}
+where $V_{\text{DD}} = 3.3$~V.
+
+When sampled by the Arduino UNO, whose standard ADC operates with a reference voltage of $V_{\text{ref}} = 5.0$~V across a 10-bit conversion range ($0\text{--}1023$ counts), the raw ADC count is:
+\begin{equation}
+\text{ADC}_{\text{raw}} = \text{round}\left(\frac{V_{\text{out}}}{V_{\text{ref}}} \times 1023\right)
+\end{equation}
+Because the maximum ESP32 DAC voltage is 3.3~V, the maximum possible ADC count is:
+\begin{equation}
+\text{ADC}_{\max} = \frac{3.3}{5.0} \times 1023 \approx 675.18
+\end{equation}
+The client-side \texttt{DacDecoder} decodes this voltage back to the engineering unit using the scaling relation:
+\begin{equation}
+v_{\text{rec}} = v_{\min} + \left(\frac{\text{ADC}_{\text{raw}}}{675.18}\right) \times (v_{\max} - v_{\min})
+\end{equation}
+
+\subsection{Hardware PWM Duty-Cycle Encoding and Decoding}
+For PWM channels, the ESP32 LEDC peripheral generates a 500~Hz carrier frequency ($T = 2000~\mu$s) with 10-bit timer resolution ($1024$ discrete steps). The duty cycle count is:
+\begin{equation}
+\text{Duty}_{\text{count}} = \text{round}(v_{\text{norm}} \times 1023)
+\end{equation}
+The resulting high pulse width $T_{\text{high}}$ is:
+\begin{equation}
+T_{\text{high}} = v_{\text{norm}} \times T
+\end{equation}
+The receiver's \texttt{PwmDecoder} measures pulse durations using non-blocking timeout-guarded input captures:
+\begin{equation}
+D_{\text{meas}} = \frac{T_{\text{high}}}{T_{\text{high}} + T_{\text{low}}}
+\end{equation}
+The physical engineering value is reconstructed as:
+\begin{equation}
+v_{\text{rec}} = v_{\min} + D_{\text{meas}} \times (v_{\max} - v_{\min})
+\end{equation}
+
+\section{Scenario Simulation and Fault Injection}
+\subsection{Scenario Engine}
+The \texttt{ScenarioEngine} implements non-blocking dynamic telemetry patterns evaluated on every firmware iteration:
+\begin{itemize}
+    \item \textbf{STATIC}: Maintains a sensor channel at a fixed setpoint $v_{\text{target}}$.
+    \item \textbf{RAMP}: Linearly interpolates a channel between $v_{\text{start}}$ and $v_{\text{end}}$ over a configurable duration $t_{\text{duration}}$:
+    \begin{equation}
+    v(t) = v_{\text{start}} + \min\left(1.0, \frac{t - t_{\text{start}}}{t_{\text{duration}}}\right) \times (v_{\text{end}} - v_{\text{start}})
+    \end{equation}
+\end{itemize}
+
+\subsection{Fault Injection Engine}
+To stress-test client firmware, the \texttt{FaultEngine} modifies the synthesized sensor state prior to hardware register encoding. Supported fault modes include:
+\begin{enumerate}
+    \item \textbf{DROPOUT}: Freezes the signal at the last valid recorded value.
+    \item \textbf{STUCK}: Pins the output to an arbitrary fixed magnitude $v_{\text{stuck}}$.
+    \item \textbf{NOISE}: Injects zero-mean Gaussian jitter with standard deviation $\sigma$, generated using the Box-Muller transform:
+    \begin{equation}
+    Z = \sqrt{-2\ln U_1}\cos(2\pi U_2), \quad v_{\text{noisy}} = v + \sigma Z
+    \end{equation}
+    where $U_1, U_2 \sim \mathcal{U}(0, 1)$.
+    \item \textbf{SPIKE}: Injects an instantaneous high-magnitude impulse $\Delta v_{\text{spike}}$.
+    \item \textbf{DRIFT}: Adds a continuous time-dependent offset:
+    \begin{equation}
+    v_{\text{drift}}(t) = v(t) + \kappa \cdot (t - t_{\text{armed}})
+    \end{equation}
+    \item \textbf{DISCONNECT}: Drops the pin to high-impedance or 0~V ground.
+    \item \textbf{LATENCY}: Buffers outgoing values through an internal 32-slot circular ring buffer, delaying output emission by $\tau$~ms.
+\end{enumerate}
+
+Fig.~\ref{fig:faults} depicts simulated ramp execution alongside active fault profiles.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{figures/fig4_fault_injection_scenarios.pdf}
+\caption{Dynamic scenario execution and fault injection modes: (a) Linear temperature ramp; (b) Real-time fault waveforms including Gaussian noise, stuck fault, and dropout.}
+\label{fig:faults}
+\end{figure}
+
+\section{Implementation}
+\subsection{ESP32 Firmware Architecture}
+The firmware is developed using the Arduino Core on PlatformIO. Thread-safety between Core~0 (WebSocket networking) and Core~1 (signal generation) is guaranteed via mutex primitives safeguarding the central \texttt{SensorState} instance. Hardware PWM channels are assigned uniquely across the 16 independent LEDC timers.
+
+\subsection{Arduino SUT Library}
+The Arduino client library exposes an ergonomic object-oriented API:
+\begin{verbatim}
+#include <OneSensor.h>
+OneSensor sensor;
+
+void setup() {
+    sensor.begin(); // Decodes defaults
+}
+void loop() {
+    sensor.update();
+    float t = sensor.readTemperature();
+    float h = sensor.readHumidity();
+}
+\end{verbatim}
+The library handles voltage domain translation, floating-point calibration offsets, and invalid signal detection.
+
+\section{Experimental Methodology}
+Laboratory evaluation was conducted on a physical test bench comprising:
+\begin{itemize}
+    \item \textbf{Host Workstation}: AMD Ryzen 7, 32~GB RAM, running Windows~11, Google Chrome, and Python~3.11.
+    \item \textbf{OneSensor Node}: ESP32 DevKit V1 connected via USB Serial (\texttt{COM5}) and IEEE 802.11b/g/n 2.4~GHz Wi-Fi.
+    \item \textbf{System Under Test}: Arduino UNO Rev3 (ATmega328P) connected via USB Serial (\texttt{COM9}).
+    \item \textbf{Physical Interconnect}: 15~cm copper jumper wires connecting ESP32 GPIO 25 directly to Arduino A0, with a shared ground plane.
+\end{itemize}
+
+Experiments were automated via Python test harnesses (\texttt{e2e\_test.py}, \texttt{calibration\_benchmark.py}) dispatching WebSocket commands to the ESP32 while simultaneously logging high-resolution serial telemetry emitted by the Arduino UNO.
+
+\section{Results and Discussion}
+
+\subsection{Physical Linearity and Calibration}
+Table~\ref{tab:bench_results} and Fig.~\ref{fig:linearity} present the physical validation results for commanded setpoints across the full $0.0\text{--}50.0$~$^\circ$C range on Channel~0 (DAC1).
+
+\begin{table*}[t]
+\caption{Physical Test Bench Experimental Validation Results (ESP32 DAC to Arduino ADC)}
+\label{tab:bench_results}
+\centering
+\begin{tabular}{ccccccc}
+\toprule
+\textbf{Commanded ($^\circ$C)} & \textbf{Nominal $V_{\text{ESP}}$ (V)} & \textbf{Nominal ADC} & \textbf{Measured ADC} & \textbf{Measured $V_{\text{phys}}$ (V)} & \textbf{Reconstructed ($^\circ$C)} & \textbf{Absolute Error} \\
+\midrule
+$0.0$ & $0.000$ & $0$ & $3$ & $0.015$ & $0.1$ & $+0.1$~$^\circ$C \\
+$10.0$ & $0.660$ & $135$ & $136$ & $0.665$ & $10.1$ & $+0.1$~$^\circ$C \\
+$25.0$ & $1.650$ & $338$ & $344$ & $1.681$ & $25.5$ & $+0.5$~$^\circ$C \\
+$33.5$ & $2.211$ & $452$ & $452$ & $2.209$ & $33.5$ & $\mathbf{0.0}$~$^\circ$C \\
+$45.0$ & $2.970$ & $608$ & $607$ & $2.966$ & $44.9$ & $-0.1$~$^\circ$C \\
+$50.0$ & $3.300$ & $675$ & $676$ & $3.304$ & $50.0$ & $0.0$~$^\circ$C \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{figures/fig3_linearity_benchmark.pdf}
+\caption{Physical DAC linearity and reconstruction accuracy: (a) Transfer curve showing near-perfect linearity ($R^2 = 0.9998$); (b) Residual error distribution showing $|\Delta T| \le 0.5$~$^\circ$C.}
+\label{fig:linearity}
+\end{figure}
+
+The Pearson correlation coefficient between commanded temperatures and measured physical voltages is:
+\begin{equation}
+R^2 = 0.9998
+\end{equation}
+The maximum recorded error is $+0.5$~$^\circ$C at the nominal midpoint ($25.0$~$^\circ$C), corresponding to a full-scale error of only $1.0\%$. At the operator setpoint of $33.5$~$^\circ$C, the reconstructed value matches exactly. Furthermore, consecutive ADC readings exhibited natural microscopic fluctuations ($\pm 1$ count, $\approx 4.88$~mV) attributable to thermal Johnson-Nyquist noise, verifying authentic physical coupling.
+
+\subsection{Latency and Real-Time Performance}
+End-to-end control loop latency was benchmarked from UI slider movement to Arduino serial telemetry. As shown in Fig.~\ref{fig:latency}, the mean total latency was $16.9$~ms (standard deviation $1.4$~ms), comfortably beneath the 18~ms real-time target.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{figures/fig5_latency_breakdown.pdf}
+\caption{End-to-end closed-loop latency profile: (a) Individual component delays; (b) Cumulative propagation delay across the system.}
+\label{fig:latency}
+\end{figure}
+
+\section{Limitations and Threats to Validity}
+While OneSensor successfully demonstrates physical multi-channel emulation, several limitations must be noted:
+\begin{enumerate}
+    \item \textbf{Transport Protocols}: The current implementation emulates analog DC voltages and digital PWM timing. It does not yet emulate digital bus slave protocols (such as I2C, SPI, or 1-Wire) at the electrical protocol level.
+    \item \textbf{Receiver Timer Overhead}: On the 16~MHz ATmega328P, measuring multiple concurrent PWM signals using software pulse-timing calls incurs processing overhead, which can constrain high-frequency client loops.
+    \item \textbf{RF Jitter}: Heavy congestion on 2.4~GHz Wi-Fi networks can introduce latency jitter into the UI-to-ESP32 control loop.
+\end{enumerate}
+
+\section{Future Work}
+Future development paths include:
+\begin{itemize}
+    \item \textbf{Digital Bus Slave Emulation}: Integrating hardware I2C and SPI peripheral slave emulation to mimic commercial smart sensors (e.g., BME280, MPU6050) over standard buses.
+    \item \textbf{Deep Learning Noise Models}: Deploying compact recurrent neural networks (RNNs) on ESP32 to emulate real-world sensor degradation and non-linear hysteresis.
+    \item \textbf{Automated CI/CD Integration}: Linking OneSensor directly into continuous integration pipelines for automated regression testing of edge firmware.
+\end{itemize}
+
+\section{Conclusion}
+This paper presented OneSensor, an ESP32-based virtual multi-sensor platform designed for deterministic, cost-effective IoT development, testing, and education. By bridging the gap between pure software simulators and high-end industrial HIL test rigs, OneSensor delivers twelve concurrent sensor channels over physical DAC and PWM electrical transports. Integrated dynamic scenario generation and an eight-mode fault-injection engine provide unprecedented control for evaluating firmware robustness against anomalies. Physical laboratory validation confirmed high electrical linearity ($R^2 = 0.9998$), sub-$0.5$~$^\circ$C reconstruction accuracy, and low closed-loop latency ($< 18$~ms). OneSensor demonstrates that high-fidelity hardware-in-the-loop sensor emulation can be achieved using accessible, off-the-shelf microcontrollers, providing a versatile foundation for resilient IoT engineering.
+
+\bibliographystyle{IEEEtran}
+\bibliography{references}
+
+\end{document}

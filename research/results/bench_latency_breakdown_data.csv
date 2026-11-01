@@ -1,0 +1,10 @@
+# bench_latency_breakdown_data.csv
+# Physical Test Bench Latency Breakdown: UI Slider -> WS Bridge -> ESP32 -> DAC -> Arduino Serial Echo
+# Columns: pipeline_stage,component_description,latency_ms,percentage_contribution
+pipeline_stage,component_description,latency_ms,percentage_contribution
+Stage 1,UI Event & JSON Serialization,1.2,7.10
+Stage 2,Local WS Proxy & 2.4GHz Wi-Fi Hop,6.5,38.46
+Stage 3,ESP32 Parsing & Register Write,0.4,2.37
+Stage 4,Physical Wire Signal Rise & Settle,2.0,11.83
+Stage 5,Arduino Sampling & Decoding,6.8,40.24
+Total,End-to-End Control Loop,16.9,100.00

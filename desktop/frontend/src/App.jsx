@@ -121,6 +121,8 @@ export default function App() {
         setIsConnected(true);
         addLog('Connected to desktop backend sidecar.', 'success');
         ws.send(JSON.stringify({ type: 'get_config' }));
+        fetchPorts();
+        fetchToolchain();
       };
 
       ws.onmessage = (event) => {
@@ -155,9 +157,14 @@ export default function App() {
     fetchPorts();
     fetchToolchain();
 
+    const portInterval = setInterval(() => {
+      fetchPorts();
+    }, 4000);
+
     return () => {
       if (ws) ws.close();
       clearTimeout(timer);
+      clearInterval(portInterval);
     };
   }, []);
 
@@ -490,6 +497,7 @@ export default function App() {
               {activeTab === 'wizard' && (
                 <SetupWizard
                   ports={ports}
+                  onRefreshPorts={fetchPorts}
                   onFlashESP32={handleFlashESP32}
                   onProvisionESP32={handleProvisionESP32}
                   onBuildFlashESP32={handleBuildFlashESP32}

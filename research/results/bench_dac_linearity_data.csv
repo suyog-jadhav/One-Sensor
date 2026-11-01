@@ -1,0 +1,11 @@
+# bench_dac_linearity_data.csv
+# Physical Test Bench Calibration Dataset: ESP32 DAC1 (GPIO 25) to Arduino UNO ADC (Pin A0)
+# Measured with shared ground over 15cm jumper wire.
+# Columns: commanded_temp_c,expected_voltage_v,ideal_adc_counts,measured_adc_counts,measured_voltage_v,reconstructed_temp_c,absolute_error_c
+commanded_temp_c,expected_voltage_v,ideal_adc_counts,measured_adc_counts,measured_voltage_v,reconstructed_temp_c,absolute_error_c
+0.0,0.000,0.0,3,0.015,0.1,0.1
+10.0,0.660,135.0,136,0.665,10.1,0.1
+25.0,1.650,337.6,344,1.681,25.5,0.5
+33.5,2.211,452.4,452,2.209,33.5,0.0
+45.0,2.970,607.7,607,2.966,44.9,-0.1
+50.0,3.300,675.2,676,3.304,50.0,0.0
